@@ -32,7 +32,7 @@
     .btn { display: inline-block; padding: 12px 28px; background: #3b82f6; color: #fff; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; }
     .cd { margin-top: 20px; font-size: 13px; color: #484f58; }
     .bw { width: 200px; height: 3px; background: #21262d; border-radius: 99px; margin: 16px auto 0; overflow: hidden; }
-    .b { height: 100%; background: #3b82f6; border-radius: 99px; animation: fill 8s linear forwards; }
+    .b { height: 100%; background: #3b82f6; border-radius: 99px; animation: fill 5s linear forwards; }
     @keyframes fill { from { width: 0% } to { width: 100% } }
   </style>
 </head>
@@ -42,13 +42,13 @@
     <div>
       <div class="logo"><span class="dot"></span>Priora</div>
       <p class="msg">We've moved!<br/><strong>Priora</strong> has a new home.</p>
-      <a class="btn" href="https://priora.vercel.app/">Go to New Site →</a>
-      <p class="cd">Redirecting automatically in 8 seconds…</p>
+      <a class="btn" href="https://priora-io.vercel.app/">Go to New Site →</a>
+      <p class="cd">Redirecting automatically in 5 seconds…</p>
       <div class="bw"><div class="b"></div></div>
     </div>
   </div>
   <script>
-    var isVercel = window.location.hostname === 'priora.vercel.app';
+    var isVercel = window.location.hostname === 'priora-io.vercel.app';
     if (isVercel) {
       var s = document.createElement('script');
       s.type = 'module';
@@ -62,11 +62,10 @@
       document.head.appendChild(css);
     } else {
       document.getElementById('root').style.display = 'none';
-      var r = document.getElementById('redirect');
-      r.style.display = 'flex';
+      document.getElementById('redirect').style.display = 'flex';
       setTimeout(function() {
-        window.location.href = 'https://priora.vercel.app/';
-      }, 8000);
+        window.location.href = 'https://priora-io.vercel.app/';
+      }, 5000);
     }
   </script>
 </body>
