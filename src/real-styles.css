@@ -1,0 +1,271 @@
+/* shared-real-styles.css
+   نسخة مستخرجة بدقة من ملف CSS الحقيقي الأصلي (index-BwMv6kYj.css) — وليس تخميناً.
+   تُستخدم بكل صفحات الاختبار (TestHarness) لكل الأقسام، لضمان تطابق الألوان والمحاذاة
+   والأنيميشن مع الإنتاج الفعلي بدقة.
+*/
+
+:root {
+  --bg: #f0f4fa;
+  --surface: #fff;
+  --surface2: #e8edf7;
+  --surface3: #dde4f2;
+  --border: #d8e0f0;
+  --border2: #c4cfea;
+  --text: #0c1428;
+  --text2: #3a4f6b;
+  --text3: #6b7fa0;
+  --accent: #2563eb;
+  --accent-light: #eef3ff;
+  --accent-text: #1d4ed8;
+  --cyan: #0891b2;
+  --cyan-bg: #ecfeff;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --orange: #ea580c;
+  --orange-bg: #fff7ed;
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --shadow: 0 1px 3px #0c142812, 0 1px 2px #0c14280a;
+  --shadow-md: 0 4px 12px #0c142817, 0 2px 4px #0c14280d;
+  --shadow-lg: 0 8px 24px #0c14281f;
+  --r: 10px;
+  --r-sm: 6px;
+  --sidebar-w: 220px;
+  --topbar-h: 50px;
+  --tr: 0.15s ease;
+  --font-en: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-ar: 'Tajawal', system-ui, sans-serif;
+  --font: var(--font-en);
+  --mono: 'IBM Plex Mono', monospace;
+  --serif: 'Instrument Serif', Georgia, serif;
+}
+
+[data-theme="dark"] {
+  --bg: #080d1a;
+  --surface: #0f1829;
+  --surface2: #162035;
+  --surface3: #1d2c48;
+  --border: #1d2c48;
+  --border2: #263d5e;
+  --text: #e0e8f5;
+  --text2: #7e9ec4;
+  --text3: #4a6384;
+  --accent: #3b82f6;
+  --accent-light: #0c1a38;
+  --accent-text: #93c5fd;
+  --cyan: #22d3ee;
+  --cyan-bg: #031f29;
+  --amber: #f59e0b;
+  --amber-bg: #1c1200;
+  --red: #f87171;
+  --red-bg: #1a0808;
+  --orange: #fb923c;
+  --orange-bg: #1a0e00;
+  --green: #4ade80;
+  --green-bg: #052e16;
+  --shadow: 0 1px 3px #0006;
+  --shadow-md: 0 4px 14px #00000080;
+  --shadow-lg: 0 10px 30px #0009;
+}
+
+[lang="ar"] { --font: var(--font-ar); }
+
+html { font-size: 14px; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+  transition: background .2s, color .2s;
+  overflow-x: hidden;
+}
+button { font-family: var(--font); cursor: pointer; background: none; border: none; }
+input, textarea, select { font-family: var(--font); }
+
+@keyframes blink { 0%, to { opacity: 1; } 50% { opacity: .25; } }
+@keyframes fade-in { 0% { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fu-blink { 0%, to { opacity: 1; } 50% { opacity: .4; } }
+.fade-in { animation: .2s forwards fade-in; }
+
+.sdot { background: currentColor; border-radius: 50%; flex-shrink: 0; width: 7px; height: 7px; display: inline-block; }
+.sdot-urgent { background: var(--red); animation: 1.4s ease-in-out infinite blink; }
+.sdot-active, .sdot-waiting, .sdot-ontrack { background: var(--accent); }
+.sdot-closed { background: var(--text3); }
+.sdot-today { background: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+.task-row { border-bottom: 1px solid var(--border); transition: background var(--tr); align-items: center; display: grid; }
+.task-row:last-child { border-bottom: none; }
+.task-row:hover { background: var(--surface2); }
+.task-row.overdue { background: color-mix(in srgb, var(--red) 4%, transparent); }
+.task-row.overdue:hover { background: color-mix(in srgb, var(--red) 8%, transparent); }
+
+.fu-today { animation: 1.8s ease-in-out infinite fu-blink; }
+
+mark {
+  background: color-mix(in srgb, var(--amber) 25%, transparent);
+  color: var(--amber);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.modal-overlay {
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+  background: #00000080;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  animation: .15s fade-in;
+  display: flex;
+  position: fixed;
+  inset: 0;
+}
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-height: 90vh;
+  animation: .18s fade-in;
+  overflow-y: auto;
+}
+.modal-header { border-bottom: 1px solid var(--border); justify-content: space-between; align-items: center; padding: 16px 20px; display: flex; }
+.modal-title { color: var(--text); font-size: 15px; font-weight: 600; }
+.modal-body { padding: 20px; }
+.modal-footer { border-top: 1px solid var(--border); background: var(--surface2); justify-content: flex-end; gap: 8px; padding: 14px 20px; display: flex; }
+
+.field { flex-direction: column; gap: 5px; margin-bottom: 14px; display: flex; }
+.field:last-child { margin-bottom: 0; }
+.label { color: var(--text3); text-transform: uppercase; letter-spacing: .05em; font-size: 12px; font-weight: 500; }
+.input, .textarea, .select {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  width: 100%; color: var(--text); font-family: var(--font); transition: var(--tr);
+  outline: none; padding: 8px 11px; font-size: 13px; box-sizing: border-box;
+}
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.textarea { resize: vertical; min-height: 80px; }
+
+.badge { white-space: nowrap; border-radius: 99px; align-items: center; gap: 4px; padding: 2px 8px; font-size: 11px; font-weight: 500; display: inline-flex; }
+.badge-active { background: var(--amber-bg); color: var(--amber); }
+.badge-waiting, .badge-ontrack { background: var(--accent-light); color: var(--accent-text); }
+.badge-closed { background: var(--surface2); color: var(--text3); }
+.badge-urgent { background: var(--red-bg); color: var(--red); }
+
+.empty-state { text-align: center; color: var(--text3); flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 48px 24px; display: flex; }
+.empty-state p { font-size: 13px; }
+
+.btn-cancel {
+  background: var(--surface2); color: var(--text2); border: 1px solid var(--border);
+  font-family: var(--font); cursor: pointer; border-radius: 6px; padding: 7px 14px;
+  font-size: 13px; transition: background .12s, color .12s;
+}
+.btn-cancel:hover { background: var(--surface3); color: var(--text); }
+.btn-primary {
+  background: var(--accent); color: #fff; font-family: var(--font); cursor: pointer;
+  border: none; border-radius: 6px; padding: 7px 20px; font-size: 13px; font-weight: 500;
+  transition: opacity .12s;
+}
+.btn-primary:hover { opacity: .88; }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+/* نصوص اسم/ملاحظة التاسك بصفوف الجدول — قصّ بنقاط على الشاشات الكبيرة، كسر كلام
+   كامل بدون قصّ على الموبايل (تُستبدل تلقائياً بالـ media query أدناه). */
+.task-name-text, .task-note-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* صف البحث/الفلاتر/الترتيب بصفحة تفاصيل الورك سبيس: على شاشات ضيقة، البحث ينزل
+   لسطر مستقل (100% عرض) بدل ما يتنازع مع الفلاتر على نفس المساحة ويتسبب بتداخل
+   بصري. على شاشات أوسع من 640px، يرجع يتشارك السطر بعرض مرن طبيعي. */
+.ws-filter-row-search { flex: 1 1 100%; min-width: 0; order: 1; }
+.ws-filter-row-chips { order: 2; }
+.ws-filter-row-sort { order: 3; margin-inline-start: auto; }
+@media (min-width: 640px) {
+  .ws-filter-row-search { flex: 1 1 200px; }
+}
+
+@media (max-width: 880px) {
+  .task-table-head { display: none !important; }
+  .task-table-wrap { overflow: visible !important; border: none !important; box-shadow: none !important; background: transparent !important; }
+  .task-name-text, .task-note-text {
+    overflow: visible !important;
+    text-overflow: initial !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+}
+
+.ctx-menu { z-index: 9999; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--shadow-lg); min-width: 180px; animation: .12s fade-in; position: fixed; overflow: hidden; }
+.ctx-item { color: var(--text2); cursor: pointer; text-align: start; align-items: center; gap: 8px; width: 100%; padding: 8px 14px; font-size: 13px; transition: background .1s; display: flex; border: none; background: none; }
+.ctx-item:hover { background: var(--surface2); color: var(--text); }
+.ctx-item.danger { color: var(--red); }
+.ctx-item.danger:hover { background: var(--red-bg); }
+.ctx-sep { background: var(--border); height: 1px; margin: 3px 0; }
+
+.fchip { border: 1px solid var(--border); background: var(--surface); color: var(--text3); cursor: pointer; transition: var(--tr); white-space: nowrap; font-size: 12px; font-family: var(--font); border-radius: 99px; align-items: center; gap: 4px; padding: 4px 11px; display: inline-flex; }
+.fchip:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+.fchip.on { background: var(--accent-light); border-color: var(--accent); color: var(--accent-text); }
+
+.toast-wrap { z-index: 99999; pointer-events: none; bottom: 20px; flex-direction: column; gap: 6px; display: flex; position: fixed; inset-inline-start: 50%; transform: translate(-50%); }
+.toast { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow-lg); white-space: nowrap; pointer-events: all; padding: 10px 16px; font-size: 13px; animation: .2s fade-in; }
+.toast.err { background: var(--red); color: #fff; border-color: var(--red); }
+
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; opacity: 0; transition: opacity .2s; }
+.sidebar-overlay.show { opacity: 1; }
+.hamburger-btn { display: none; }
+
+@media (max-width: 880px) {
+  .hamburger-btn { display: flex !important; }
+  .app-sidebar {
+    position: fixed !important;
+    top: var(--topbar-h) !important;
+    left: 0;
+    /* الارتفاع يُحسب الآن inline بـSidebar.jsx عبر useViewportHeight (JS حقيقي)
+       بدل 100vh CSS — هذا يحمي من تشوّه التخطيط عند تغيير حجم الخط (zoom).
+       لا نضع height هنا عمداً، لنسمح للقيمة inline (أعلى أولوية بدون !important) تُطبَّق. */
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,.15);
+  }
+  [dir="rtl"] .app-sidebar { left: auto; right: 0; transform: translateX(100%); }
+  .app-sidebar.open { transform: translateX(0) !important; }
+  .sidebar-overlay.show { display: block; }
+
+  .task-row { box-sizing: border-box; max-width: 100%; overflow: hidden; }
+  .task-row {
+    display: flex !important; flex-direction: column !important; align-items: stretch !important;
+    grid-template-columns: none !important; padding: 14px; gap: 7px; text-align: start !important;
+    margin-bottom: 12px !important; border: 1px solid var(--border) !important; border-radius: var(--r) !important;
+    background: var(--surface) !important;
+  }
+  .task-row:last-child { margin-bottom: 0 !important; }
+  .task-row > div { width: 100%; max-width: 100%; box-sizing: border-box; text-align: start !important; }
+  .task-row > div, .task-row > div * {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    text-overflow: initial !important;
+  }
+  .task-row > div:not(:first-child):not(:last-child) { padding: 0 !important; position: relative; padding-inline-start: 80px !important; }
+  .task-row > div:not(:first-child):not(:last-child)::before { position: absolute; inset-inline-start: 0; top: 0; color: var(--text3); font-size: 11px; line-height: 1.5; white-space: nowrap; }
+  .task-row > div:nth-child(2)::before { content: "Last action"; }
+  .task-row > div:nth-child(3)::before { content: "Updated"; }
+  .task-row > div:nth-child(3) span:first-child { color: var(--text) !important; font-weight: 400 !important; }
+  .task-row > div:nth-child(3) span:nth-child(2) { font-weight: 400 !important; color: var(--text2) !important; background: var(--surface2) !important; border-color: var(--border) !important; }
+  .task-row > div:nth-child(4)::before { content: "Follow-up"; }
+  .task-row > div:nth-child(5)::before { content: "Status"; }
+  .task-row > div:last-child { display: flex !important; gap: 6px; padding: 0 !important; margin-top: 2px; flex-wrap: wrap; }
+  .task-row > div:last-child > button:first-of-type { flex: 1; }
+}
