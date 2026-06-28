@@ -14,8 +14,22 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [prefillForNewContact, setPrefillForNewContact] = useState(null);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+
+  // ⚠️ إصلاح بطلب صريح: القائمة كانت تظهر دائماً تحت الحقل، حتى لو ما فيه مساحة
+  // كافية (مثلاً الحقل قريب من نهاية نافذة/مودال) — تختفي مقتطعة جزئياً. الآن نفحص
+  // المساحة المتاحة أسفل الحقل فعلياً لحظة الفتح، ولو غير كافية، تظهر القائمة فوق
+  // الحقل تلقائياً بدلاً من تحته.
+  function openDropdown() {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 220); // 220 يطابق تقريباً ارتفاع القائمة الأقصى (maxHeight: 200 + هوامش)
+    }
+    setShowDropdown(true);
+  }
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -73,16 +87,17 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
           ref={inputRef}
           className="input"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
-          onFocus={() => setShowDropdown(true)}
+          onChange={(e) => { setQuery(e.target.value); openDropdown(); }}
+          onFocus={openDropdown}
           placeholder={selectedContacts.length ? 'Add another…' : 'Type a name…'}
         />
         {showDropdown && (query.length >= 1 || contacts.length > 0) && (
           <div
             style={{
-              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface)',
-              border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-lg)', marginTop: 3,
+              position: 'absolute', left: 0, right: 0, zIndex: 200, background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-lg)',
               maxHeight: 200, overflowY: 'auto',
+              ...(openUpward ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
             }}
           >
             {matchingContacts.slice(0, 7).map((c) => (
