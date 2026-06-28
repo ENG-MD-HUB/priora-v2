@@ -1,6 +1,10 @@
 // MembersModal.jsx
 // مودال إدارة أعضاء ورك سبيس — نسخة مُعاد كتابتها بوضوح من المكوّن `kt` بالكود الأصلي.
 //
+// ⚠️ تغيير سلوك مقصود بطلب صريح: زر "+ Add Member Manually" (موجود بالكود الأصلي
+// قبل أي تعديل مني، يضيف عضو فوراً بدون أي تأكيد أو دعوة) تم حذفه بالكامل. الطريقة
+// الوحيدة المتبقية للانضمام لورك سبيس الآن هي رمز الدعوة اليدوي (Invite Code) فقط.
+//
 // ملاحظة مهمة بخصوص حذف عضو (مؤكدة من الكود الأصلي حرفياً، وليست تخميناً):
 // 1. تاسكات العضو الداخلية بالورك سبيس (workspaces/{wsId}/tasks، ownerId = هذا العضو،
 //    workspaceId === null) تُحذف نهائياً.
@@ -20,11 +24,9 @@ import { useAuthStore } from '../store/authStore';
 import { useMembersStore } from '../store/membersStore';
 import { useTasksStore } from '../store/tasksStore';
 import { showToast } from '../store/toastStore';
-import { generateId } from '../utils/generateId';
 
 export function MembersModal({ ws, onClose, testMode = false, initialMembers = [] }) {
   const user = useAuthStore((s) => s.user);
-  const addMember = useMembersStore((s) => s.addMember);
   const removeMemberFromStore = useMembersStore((s) => s.removeMember);
 
   const [members, setMembers] = useState(initialMembers);
@@ -35,29 +37,6 @@ export function MembersModal({ ws, onClose, testMode = false, initialMembers = [
   }, [ws.id, testMode]);
 
   const isOwner = ws.ownerId === user?.uid;
-
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
-
-  function handleAddMemberManually(e) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    const member = {
-      uid: generateId(),
-      name: newName.trim(),
-      email: newEmail.trim(),
-      role: 'member',
-      joinedAt: new Date().toISOString(),
-    };
-
-    addMember(ws.id, member);
-    setNewName('');
-    setNewEmail('');
-    setShowAddForm(false);
-    showToast('Member added');
-  }
 
   async function handleRemoveMember(member) {
     if (!window.confirm(`Remove ${member.name} from workspace? Their shared tasks will be removed.`)) return;
@@ -173,74 +152,6 @@ export function MembersModal({ ws, onClose, testMode = false, initialMembers = [
           <p style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0', fontStyle: 'italic' }}>
             Share the invite code to add members.
           </p>
-        )}
-
-        {isOwner && (
-          <div style={{ marginTop: 14 }}>
-            {showAddForm ? (
-              <form
-                onSubmit={handleAddMemberManually}
-                style={{ background: 'var(--surface2)', borderRadius: 8, padding: 12, border: '1px solid var(--border)' }}
-              >
-                <div className="field">
-                  <label className="label">Name *</label>
-                  <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
-                </div>
-                <div className="field" style={{ marginBottom: 10 }}>
-                  <label className="label">Email</label>
-                  <input className="input" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} type="email" />
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="submit"
-                    disabled={!newName.trim()}
-                    style={{
-                      padding: '5px 14px',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 5,
-                      fontFamily: 'var(--font)',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      opacity: newName.trim() ? 1 : 0.5,
-                    }}
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddForm(false); setNewName(''); setNewEmail(''); }}
-                    className="btn-cancel"
-                    style={{ padding: '5px 12px', fontSize: 12 }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 12px',
-                  background: 'var(--accent-light)',
-                  color: 'var(--accent-text)',
-                  border: '1px solid color-mix(in srgb,var(--accent) 25%,var(--border))',
-                  borderRadius: 6,
-                  fontFamily: 'var(--font)',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                + Add Member Manually
-              </button>
-            )}
-          </div>
         )}
       </div>
 

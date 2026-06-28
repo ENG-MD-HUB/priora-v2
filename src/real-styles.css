@@ -87,6 +87,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* ⚠️ إصلاح إضافي: شريط التمرير (حتى الرفيع) يحجز مساحة فعلية من عرض الصفحة —
+     ظهوره/اختفاؤه الديناميكي (مثلاً عند تغيير المحتوى) كان يسبب "ارتجاف" بصري
+     خفيف بعرض المحتوى. scrollbar-gutter يحجز هذي المساحة دائماً ومسبقاً، حتى لو
+     التمرير غير مطلوب حالياً، فما يصير أي تغيّر بالعرض عند ظهور الشريط فعلياً. */
+  scrollbar-gutter: stable;
 }
 button { font-family: var(--font); cursor: pointer; background: none; border: none; }
 input, textarea, select { font-family: var(--font); }
