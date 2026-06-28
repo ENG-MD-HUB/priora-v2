@@ -70,7 +70,7 @@ export function MembersModal({ ws, onClose, testMode = false, initialMembers = [
   }
 
   return (
-    <Modal title={`${ws.name} — Members`} onClose={onClose} maxWidth={480} closeOnOutsideClick={!showAddForm}>
+    <Modal title={`${ws.name} — Members`} onClose={onClose} maxWidth={480} closeOnOutsideClick>
       <div className="modal-body" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
         <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
           Members ({members.length})
