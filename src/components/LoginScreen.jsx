@@ -10,7 +10,7 @@ import { authService as realAuthService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 import { showToast } from '../store/toastStore';
 import { AnimatedBackground } from './AnimatedBackground';
-import { APP_TAGLINE } from '../utils/appConstants';
+import { APP_TAGLINE, APP_VERSION } from '../utils/appConstants';
 
 // ملاحظة: prop اختياري `authService` أضيف فقط لتسهيل الاختبار بدون اتصال Firebase
 // حقيقي (انظر TestHarness.jsx). بالاستخدام الطبيعي (بدون تمرير أي prop)، يستخدم
@@ -275,7 +275,7 @@ export function LoginScreen({ authService = realAuthService } = {}) {
           </form>
         </div>
         <p style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
-          Priora v2.0
+          Priora v{APP_VERSION}
         </p>
       </div>
     </div>

@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes } from '../utils/useIdleScreensaver';
 
 const FEATURES_LIST = [
   { icon: '◈', title: 'Team Workspaces', desc: 'Invite your team via secure codes. Collaborate in real-time — every update, every task, visible to all members instantly across all devices.' },
@@ -66,10 +66,16 @@ export function SettingsModal({ onClose }) {
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [photoURL, setPhotoURL] = useState(user?.photoURL ?? '');
   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
+  const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
 
   function handleToggleScreensaver(value) {
     setScreensaverEnabledState(value);
     setScreensaverEnabled(value);
+  }
+
+  function handleChangeScreensaverMinutes(value) {
+    const clamped = setScreensaverMinutes(value);
+    setScreensaverMinutesState(clamped);
   }
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -303,7 +309,7 @@ export function SettingsModal({ onClose }) {
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Screensaver</div>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer' }}>
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Show after 20 minutes idle</div>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Show after idle</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>A calm starfield with the Priora logo. Any click or key press dismisses it.</div>
                   </div>
                   <input
@@ -313,6 +319,19 @@ export function SettingsModal({ onClose }) {
                     style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0, marginInlineStart: 12 }}
                   />
                 </label>
+                {screensaverEnabled && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', marginTop: 6, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>Idle duration (minutes)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={screensaverMinutes}
+                      onChange={(e) => handleChangeScreensaverMinutes(Number(e.target.value))}
+                      style={{ width: 64, padding: '5px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, fontFamily: 'var(--mono)', textAlign: 'center' }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

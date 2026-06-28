@@ -91,6 +91,20 @@ body {
 button { font-family: var(--font); cursor: pointer; background: none; border: none; }
 input, textarea, select { font-family: var(--font); }
 
+/* ⚠️ إضافة بطلب صريح: شريط تمرير رفيع وهادئ يتناسق مع ألوان التطبيق، بدل الشكل
+   الافتراضي البارز للمتصفح (رمادي/فاتح فوق خلفية داكنة، يبدو مشوّهاً وغير متناسق).
+   لا نخفي الشريط بالكامل — هذا يكسر إمكانية التمرير بالقوائم/الجداول الطويلة —
+   فقط نُرقّقه ونُلوّنه بهدوء. يعمل بمتصفحات Chromium (::-webkit-scrollbar) وFirefox
+   (scrollbar-width/scrollbar-color) معاً. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
 @keyframes blink { 0%, to { opacity: 1; } 50% { opacity: .25; } }
 @keyframes fade-in { 0% { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes fu-blink { 0%, to { opacity: 1; } 50% { opacity: .4; } }

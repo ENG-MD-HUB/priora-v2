@@ -171,33 +171,47 @@ export function Sidebar() {
 
     return (
       <div key={folder.id}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          {isRoot && hasChildren && (
-            <button
-              onClick={() => toggleRootExpanded(folder.id)}
-              style={{ width: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', marginInlineStart: isChild ? 22 : 6 }}
-            >
-              <span style={{ transition: 'transform .15s', transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', display: 'flex' }}>
-                <Icon name="chevron-down" size={9} />
-              </span>
-            </button>
-          )}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center',
+            background: isActive ? 'var(--accent-light)' : 'none',
+            borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+            transition: 'background .12s',
+          }}
+          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface2)'; }}
+          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'none'; }}
+        >
+          {/* مساحة ثابتة لمكان السهم دائماً (حتى لو فاضية بدون سهم فعلي) — هذا يضمن
+              محاذاة متطابقة لكل صفوف المجلدات، بغض النظر عن وجود فروع أو لا، وبغض
+              النظر عن كونه مجلد رئيسي أو فرعي. العرض الكامل = نفس مسافة الإزاحة
+              للمجلد الفرعي (22px) أو أقل بمقدار عرض السهم نفسه للرئيسي. */}
+          <div style={{ width: isChild ? 22 : 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInlineStart: isChild ? 16 : 0 }}>
+            {isRoot && hasChildren && (
+              <button
+                onClick={() => toggleRootExpanded(folder.id)}
+                style={{ width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
+              >
+                <span style={{ transition: 'transform .15s', transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', display: 'flex' }}>
+                  <Icon name="chevron-down" size={9} />
+                </span>
+              </button>
+            )}
+          </div>
           <button
             onClick={() => setActiveView(viewId)}
             onContextMenu={(e) => handleFolderContextMenu(e, folder)}
             style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: 7,
-              padding: `6px 14px 6px ${isChild ? 38 : hasChildren ? 4 : 22}px`,
+              padding: '6px 14px 6px 2px',
               cursor: 'pointer', color: isActive ? 'var(--accent)' : 'var(--text2)', fontSize: 13,
-              background: isActive ? 'var(--accent-light)' : 'none', border: 'none',
-              borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
-              fontFamily: 'var(--font)', fontWeight: isActive ? 500 : 400, transition: 'all .12s', textAlign: 'start',
+              background: 'none', border: 'none',
+              fontFamily: 'var(--font)', fontWeight: isActive ? 500 : 400, transition: 'color .12s', textAlign: 'start',
             }}
-            onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)'; } }}
-            onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text2)'; } }}
           >
+            {/* أيقونة المجلد بحجم ثابت دائماً (مجلد رئيسي أو فرعي) — موحّدة بدل
+                تصغيرها للفروع، حتى تبدو كل المجلدات بحجم متساوٍ بالشريط الجانبي. */}
             <span style={{ flexShrink: 0, display: 'flex' }}>
-              <WindowsFolderIcon color={displayColor} size={isChild ? 14 : 15} />
+              <WindowsFolderIcon color={displayColor} size={15} />
             </span>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
             {openTaskCount > 0 && (
