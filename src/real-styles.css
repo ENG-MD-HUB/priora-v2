@@ -82,6 +82,11 @@ body {
   line-height: 1.5;
   transition: background .2s, color .2s;
   overflow-x: hidden;
+  /* ⚠️ إضافة بطلب صريح: تحسين وضوح الخطوط الصغيرة بشكل عام بكل التطبيق — خصوصاً
+     النصوص الفاتحة على خلفية داكنة، اللي كانت تبدو رفيعة وغير واضحة بدون هذا. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 button { font-family: var(--font); cursor: pointer; background: none; border: none; }
 input, textarea, select { font-family: var(--font); }

@@ -24,6 +24,8 @@ import { foldersService } from './services/foldersService';
 import { contactsService } from './services/contactsService';
 import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
 import { useFontScale } from './utils/useFontScale';
+import { useIdleScreensaver } from './utils/useIdleScreensaver';
+import { Screensaver } from './components/Screensaver';
 import { shouldMigrateFoldersToSubfolders, runFoldersToSubfoldersMigration, markFoldersMigrated } from './utils/migrateFoldersToSubfolders';
 import { LoginScreen } from './components/LoginScreen';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -107,9 +109,11 @@ function AuthenticatedApp() {
   }, [activeView]);
 
   const fontScale = useFontScale();
+  const screensaver = useIdleScreensaver();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 0 }}>
+      {screensaver.isActive && <Screensaver onDismiss={screensaver.dismiss} />}
       <TopBar fontScale={fontScale} />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Sidebar />

@@ -9,10 +9,22 @@
 // ملاحظة partialize مهمة: فقط lang, theme, sortConfig تُحفظ بـ localStorage فعلياً.
 // sidebarOpen, activeView, searchQuery, filterStatus, syncStatus تُعاد لقيمتها
 // الافتراضية بكل تحميل صفحة جديد (لا تُحفظ).
+//
+// ⚠️ تصحيح بطلب صريح: sidebarOpen كانت true ثابتة بالأصل (بدون فحص عرض الشاشة) —
+// هذا لا يؤثر بالديسكتوب (قاعدة .app-sidebar.open غير موجودة أصلاً بقواعد الديسكتوب،
+// فالقيمة بلا تأثير هناك)، لكنه يجعل السايد بار يبدأ "مفتوح" بصرياً بوضع الموبايل
+// عند أول تحميل، بدل أن يبدأ مغلقاً كما يُتوقع منطقياً بمساحة شاشة صغيرة.
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { STORAGE_KEY_PREFIX } from '../utils/appConstants';
+
+const MOBILE_BREAKPOINT_PX = 880; // يطابق @media (max-width: 880px) بملف real-styles.css
+
+function getInitialSidebarOpen() {
+  if (typeof window === 'undefined') return true;
+  return window.innerWidth > MOBILE_BREAKPOINT_PX;
+}
 
 export const useUIStore = create(
   persist(
@@ -20,7 +32,7 @@ export const useUIStore = create(
       lang: 'en',
       theme: 'dark',
       syncStatus: 'hidden',
-      sidebarOpen: true,
+      sidebarOpen: getInitialSidebarOpen(),
       activeView: 'dashboard',
       searchQuery: '',
       filterStatus: 'all',

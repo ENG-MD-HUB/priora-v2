@@ -182,7 +182,7 @@ export function WorkspacesListView() {
                   <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2 }}>Invite Code</div>
-                      <code style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--accent)', letterSpacing: '.08em', fontWeight: 500 }}>{ws.inviteCode}</code>
+                      <code style={{ fontSize: 20, fontFamily: 'var(--mono)', color: 'var(--accent)', letterSpacing: '.1em', fontWeight: 700 }}>{ws.inviteCode}</code>
                     </div>
                     <button
                       onClick={() => navigator.clipboard?.writeText(ws.inviteCode).then(() => showToast('Copied!'))}
