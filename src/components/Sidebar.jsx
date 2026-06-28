@@ -26,7 +26,6 @@ import { authService } from '../services/authService';
 import { showToast } from '../store/toastStore';
 import { isTaskOverdue } from '../utils/taskDateLogic';
 import { useHijriDate } from '../utils/useHijriDate';
-import { useViewportHeight } from '../utils/useViewportHeight';
 import { getAdaptiveFolderColor } from '../utils/folderColors';
 import { Icon } from './Icon';
 import { WindowsFolderIcon } from './WindowsFolderIcon';
@@ -36,12 +35,9 @@ import { Modal } from './Modal';
 import { AboutModal } from './AboutModal';
 import { SettingsModal } from './SettingsModal';
 
-const TOPBAR_HEIGHT_PX = 50; // يطابق --topbar-h بملف real-styles.css بالضبط
-
 const FOLDER_COLOR_OPTIONS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280', '#ffffff'];
 
 export function Sidebar({ fontScale }) {
-  const viewportHeight = useViewportHeight();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const activeView = useUIStore((s) => s.activeView);
@@ -233,7 +229,17 @@ export function Sidebar({ fontScale }) {
         className={`app-sidebar${sidebarOpen ? ' open' : ''}`}
         style={{
           width: 'var(--sidebar-w)', flexShrink: 0, borderInlineEnd: '1px solid var(--border)',
-          position: 'sticky', top: 'var(--topbar-h)', height: `${viewportHeight - TOPBAR_HEIGHT_PX}px`,
+          // ⚠️ تصحيح خلل حقيقي بطلب صريح: كنا نحسب الارتفاع بـJavaScript بدقة
+          // (viewportHeight - topbarHeight)، لكن أي فرق تقريب بسيط (حتى بكسل واحد)
+          // كان يجعل السايد بار أطول قليلاً من المساحة الفعلية، فيدفع الصفحة كاملة
+          // لتتجاوز ارتفاع الشاشة ويظهر شريط تمرير عمودي دائم على مستوى الصفحة —
+          // مش شريط تمرير طبيعي لمحتوى داخلي، بل خلل بقياس الصفحة بالكامل.
+          //
+          // الحل: لا نحدد ارتفاعاً صريحاً إطلاقاً. الحاوية الأب بـApp.jsx
+          // (display:flex بدون flexDirection محدد = row، وبدون alignItems محدد =
+          // stretch الافتراضي) تمدّد السايد بار تلقائياً ليطابق ارتفاعها الفعلي
+          // بدقة 100% بدون أي حساب يدوي قد يحمل خطأ تقريب.
+          position: 'sticky', top: 'var(--topbar-h)',
           overflowY: 'auto', overflowX: 'hidden', background: 'var(--surface)', display: 'flex', flexDirection: 'column',
         }}
       >
