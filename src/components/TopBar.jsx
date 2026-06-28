@@ -15,9 +15,8 @@ import { createTranslator } from '../utils/translations';
 import { debounce } from '../utils/debounce';
 import { useOnlineStatus } from '../utils/useOnlineStatus';
 import { NotificationBell } from './NotificationBell';
-import { FontScaleControl } from './FontScaleControl';
 
-export function TopBar({ fontScale }) {
+export function TopBar() {
   const lang = useUIStore((s) => s.lang);
   const theme = useUIStore((s) => s.theme);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
@@ -111,11 +110,7 @@ export function TopBar({ fontScale }) {
       )}
 
       <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 6px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--surface)' }}>
-          <FontScaleControl fontScale={fontScale} />
-          <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
-          <NotificationBell />
-        </div>
+        <NotificationBell />
         <div style={{ flexShrink: 0 }}>
           {online ? (
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px rgba(34,197,94,.5)' }} title="Online" />

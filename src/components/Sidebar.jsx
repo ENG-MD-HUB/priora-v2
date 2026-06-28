@@ -40,7 +40,7 @@ const TOPBAR_HEIGHT_PX = 50; // يطابق --topbar-h بملف real-styles.css �
 
 const FOLDER_COLOR_OPTIONS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280', '#ffffff'];
 
-export function Sidebar() {
+export function Sidebar({ fontScale }) {
   const viewportHeight = useViewportHeight();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
@@ -326,7 +326,7 @@ export function Sidebar() {
         </div>
 
         {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} fontScale={fontScale} />}
 
         {folderCtxMenu && (
           <FolderContextMenu

@@ -26,7 +26,48 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
+import { FontScaleControl } from './FontScaleControl';
+
+const SCREENSAVER_DESIGN_OPTIONS = [
+  {
+    id: 'starfield',
+    label: 'Starfield',
+    previewBg: '#05060a',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', width: 3, height: 3, borderRadius: '50%', background: '#fff', top: 6, left: 10, opacity: .8 }} />
+        <div style={{ position: 'absolute', width: 2, height: 2, borderRadius: '50%', background: '#dce8ff', top: 18, left: 24 }} />
+        <div style={{ position: 'absolute', width: 2, height: 2, borderRadius: '50%', background: '#fff4d9', top: 10, left: 30, opacity: .6 }} />
+        <div style={{ position: 'absolute', width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle, #7d9bff, transparent)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      </>
+    ),
+  },
+  {
+    id: 'aurora',
+    label: 'Aurora',
+    previewBg: '#04050a',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle, #4f7cff, transparent 70%)', top: -6, left: -4, filter: 'blur(4px)' }} />
+        <div style={{ position: 'absolute', width: 20, height: 20, borderRadius: '50%', background: 'radial-gradient(circle, #2fd4c9, transparent 70%)', top: 10, left: 18, filter: 'blur(4px)' }} />
+        <div style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: '#fff', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', opacity: .85 }} />
+      </>
+    ),
+  },
+  {
+    id: 'orbit',
+    label: 'Orbit',
+    previewBg: '#05060a',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', inset: 4, border: '1px solid rgba(120,160,255,.4)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', inset: 12, border: '1px solid rgba(160,130,255,.35)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: '#fff', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', opacity: .85 }} />
+      </>
+    ),
+  },
+];
 
 const FEATURES_LIST = [
   { icon: '◈', title: 'Team Workspaces', desc: 'Invite your team via secure codes. Collaborate in real-time — every update, every task, visible to all members instantly across all devices.' },
@@ -49,7 +90,7 @@ const SETTINGS_TABS = [
   { id: 'about', label: 'About' },
 ];
 
-export function SettingsModal({ onClose }) {
+export function SettingsModal({ onClose, fontScale }) {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const theme = useUIStore((s) => s.theme);
@@ -67,6 +108,7 @@ export function SettingsModal({ onClose }) {
   const [photoURL, setPhotoURL] = useState(user?.photoURL ?? '');
   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
+  const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
 
   function handleToggleScreensaver(value) {
     setScreensaverEnabledState(value);
@@ -76,6 +118,11 @@ export function SettingsModal({ onClose }) {
   function handleChangeScreensaverMinutes(value) {
     const clamped = setScreensaverMinutes(value);
     setScreensaverMinutesState(clamped);
+  }
+
+  function handleChangeScreensaverDesign(design) {
+    const safe = setScreensaverDesign(design);
+    setScreensaverDesignState(safe);
   }
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -320,18 +367,52 @@ export function SettingsModal({ onClose }) {
                   />
                 </label>
                 {screensaverEnabled && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', marginTop: 6, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>Idle duration (minutes)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={180}
-                      value={screensaverMinutes}
-                      onChange={(e) => handleChangeScreensaverMinutes(Number(e.target.value))}
-                      style={{ width: 64, padding: '5px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, fontFamily: 'var(--mono)', textAlign: 'center' }}
-                    />
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', marginTop: 6, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text2)' }}>Idle duration (minutes)</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={180}
+                        value={screensaverMinutes}
+                        onChange={(e) => handleChangeScreensaverMinutes(Number(e.target.value))}
+                        style={{ width: 64, padding: '5px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, fontFamily: 'var(--mono)', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Style</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {SCREENSAVER_DESIGN_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.id}
+                            onClick={() => handleChangeScreensaverDesign(opt.id)}
+                            style={{
+                              flex: 1, padding: '12px 8px', border: `2px solid ${screensaverDesign === opt.id ? 'var(--accent)' : 'var(--border)'}`,
+                              borderRadius: 10, background: screensaverDesign === opt.id ? 'var(--accent-light)' : 'var(--surface2)',
+                              cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                            }}
+                          >
+                            <div style={{ width: '100%', height: 36, borderRadius: 6, background: opt.previewBg, position: 'relative', overflow: 'hidden' }}>
+                              {opt.previewElement}
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: screensaverDesign === opt.id ? 600 : 400, color: screensaverDesign === opt.id ? 'var(--accent-text)' : 'var(--text2)' }}>
+                              {opt.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>App Size</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>Zoom level</span>
+                  {fontScale && <FontScaleControl fontScale={fontScale} />}
+                </div>
               </div>
             </div>
           )}

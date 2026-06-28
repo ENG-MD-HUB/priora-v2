@@ -26,6 +26,8 @@ import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotif
 import { useFontScale } from './utils/useFontScale';
 import { useIdleScreensaver } from './utils/useIdleScreensaver';
 import { Screensaver } from './components/Screensaver';
+import { ScreensaverAurora } from './components/ScreensaverAurora';
+import { ScreensaverOrbit } from './components/ScreensaverOrbit';
 import { shouldMigrateFoldersToSubfolders, runFoldersToSubfoldersMigration, markFoldersMigrated } from './utils/migrateFoldersToSubfolders';
 import { LoginScreen } from './components/LoginScreen';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -43,6 +45,7 @@ import { GlobalSearchPage } from './components/GlobalSearchPage';
 // أسماء الصفحات اللي لها محتوى خاص بها دائماً (مش خاضعة لاستبدال نتائج البحث
 // الشامل) — نسخة من المتغير Bt بالكود الأصلي.
 const VIEWS_WITH_OWN_CONTENT = ['dashboard', 'completed', 'trash', 'contacts', 'workspaces'];
+const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit };
 
 function AuthenticatedApp() {
   const activeView = useUIStore((s) => s.activeView);
@@ -110,13 +113,14 @@ function AuthenticatedApp() {
 
   const fontScale = useFontScale();
   const screensaver = useIdleScreensaver();
+  const ScreensaverComponent = SCREENSAVER_COMPONENTS[screensaver.design] ?? Screensaver;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 0 }}>
-      {screensaver.isActive && <Screensaver onDismiss={screensaver.dismiss} />}
-      <TopBar fontScale={fontScale} />
+      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} />}
+      <TopBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <Sidebar />
+        <Sidebar fontScale={fontScale} />
         <main style={{ flex: 1, padding: '18px 22px', overflow: 'auto', minWidth: 0 }}>
           {showGlobalSearchInstead ? (
             <GlobalSearchPage />
