@@ -1,0 +1,18 @@
+diff --git a/src/real-styles.css b/src/real-styles.css
+index 2160d98..7ef43cd 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -282,7 +282,12 @@ mark {
+        حساب يدوي بالبكسل، وبهذا overflowY:auto يشتغل صح ويصير قابل للتمرير. */
+     left: 0;
+     bottom: 0;
+-    z-index: 200;
++    /* ⚠️ تصحيح خلل حقيقي: z-index هنا بدون !important كان يُهزَم من inline
++       zIndex:10 المُضاف بالوضع العادي بـSidebar.jsx (الـ inline يتفوّق دائماً
++       على أي قاعدة CSS بدون !important، بغض النظر عن الـmedia query). النتيجة:
++       بالموبايل صار السايد بار فعلياً أقل طبقة من الخلفية المعتمة (.sidebar-overlay
++       بـz-index:199)، فطلعت فوقه وسدّت كل ضغطة عليه. الحل: !important هنا. */
++    z-index: 200 !important;
+     transform: translateX(-100%);
+     transition: transform .25s ease;
+     box-shadow: 2px 0 12px rgba(0,0,0,.15);

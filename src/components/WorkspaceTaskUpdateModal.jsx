@@ -17,6 +17,7 @@ import { Modal } from './Modal';
 import { useAuthStore } from '../store/authStore';
 import { useTasksStore } from '../store/tasksStore';
 import { wsTaskService } from '../services/wsTaskService';
+import { tasksService } from '../services/tasksService';
 import { notificationService } from '../services/notificationService';
 import { showToast } from '../store/toastStore';
 import { generateId } from '../utils/generateId';
@@ -59,11 +60,24 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
     onClose();
     wsTaskService.save(wsId, updatedTask).catch((err) => console.warn('ws save:', err));
 
-    if (updatedTask.workspaceId === null) {
-      const { updateTask, addTimelineEntry } = useTasksStore.getState();
-      addTimelineEntry(task.id, entry.text, entry.date, entry.authorId, entry.authorName, entry.authorAvatar);
-      if (newStatus && newStatus !== task.status) updateTask(task.id, { status: updatedTask.status });
-      if (showFollowup && followupDate) updateTask(task.id, { nextFollowup: followupDate });
+    // ⚠️ تصحيح خلل حقيقي: الكود السابق كان يعتمد على وجود هذا التاسك أصلاً
+    // بالكاش المحلي (useTasksStore) لحظة الكتابة (عن طريق addTimelineEntry/
+    // updateTask، اللي تبحث عنه بـ state.tasks.find). لو التاسك مو موجود هناك
+    // بتلك اللحظة (تحميل لسا ما اكتمل، جلسة/تبويب مختلف، إلخ) — الكتابة للمصدر
+    // الشخصي تُلغى بصمت تام، بدون أي خطأ ظاهر. هذا بالضبط سبب "التحديث ما انعكس
+    // بالمصدر" رغم إن صاحب التاسك نفسه هو اللي أضافه.
+    //
+    // الحل: نكتب مباشرة لمستند Firestore الشخصي من بيانات updatedTask نفسها
+    // (متوفرة بالكامل هنا أصلاً، بغض النظر عن حالة الكاش المحلي) — بشرط إن
+        // المستخدم الحالي هو فعلاً مالك التاسك (task.ownerId === user.uid)، حماية
+    // تمنع أي محاولة كتابة بمكان مستخدم ثاني.
+    if (updatedTask.workspaceId === null && task.ownerId === user.uid) {
+      useTasksStore.setState((state) => ({
+        tasks: state.tasks.some((t) => t.id === task.id)
+          ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+          : state.tasks,
+      }));
+      tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
     }
 
     notificationService

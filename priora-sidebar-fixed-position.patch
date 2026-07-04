@@ -1,0 +1,88 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 8541f13..067a8bb 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -165,7 +165,7 @@ function AuthenticatedApp() {
+       <TopBar />
+       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+         <Sidebar fontScale={fontScale} />
+-        <main style={{ flex: 1, padding: '18px 22px', overflow: 'auto', minWidth: 0 }}>
++        <main className="app-main" style={{ flex: 1, padding: '18px 22px', overflow: 'auto', minWidth: 0 }}>
+           {showGlobalSearchInstead ? (
+             <GlobalSearchPage />
+           ) : (
+diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
+index bd07c52..ab80f43 100644
+--- a/src/components/Sidebar.jsx
++++ b/src/components/Sidebar.jsx
+@@ -229,17 +229,19 @@ export function Sidebar({ fontScale }) {
+         className={`app-sidebar${sidebarOpen ? ' open' : ''}`}
+         style={{
+           width: 'var(--sidebar-w)', flexShrink: 0, borderInlineEnd: '1px solid var(--border)',
+-          // ⚠️ تصحيح خلل حقيقي بطلب صريح: كنا نحسب الارتفاع بـJavaScript بدقة
+-          // (viewportHeight - topbarHeight)، لكن أي فرق تقريب بسيط (حتى بكسل واحد)
+-          // كان يجعل السايد بار أطول قليلاً من المساحة الفعلية، فيدفع الصفحة كاملة
+-          // لتتجاوز ارتفاع الشاشة ويظهر شريط تمرير عمودي دائم على مستوى الصفحة —
+-          // مش شريط تمرير طبيعي لمحتوى داخلي، بل خلل بقياس الصفحة بالكامل.
+-          //
+-          // الحل: لا نحدد ارتفاعاً صريحاً إطلاقاً. الحاوية الأب بـApp.jsx
+-          // (display:flex بدون flexDirection محدد = row، وبدون alignItems محدد =
+-          // stretch الافتراضي) تمدّد السايد بار تلقائياً ليطابق ارتفاعها الفعلي
+-          // بدقة 100% بدون أي حساب يدوي قد يحمل خطأ تقريب.
+-          position: 'sticky', top: 'var(--topbar-h)',
++          // ⚠️ تصحيح خلل حقيقي بطلب صريح (يستبدل محاولة sticky السابقة، اللي ثبت
++          // إنها غير موثوقة): كنا نعتمد على position:sticky + تمدد الفليكس التلقائي
++          // (بدل حساب ارتفاع يدوي) عشان نتفادى خلل "شريط تمرير على مستوى الصفحة"
++          // القديم. لكن sticky اتضح إنها ما تشتغل بثبات مع هذا التصميم تحديداً (حتى
++          // بعد إصلاح body/overflow) — على الأغلب بسبب تفاعل معقّد بين تمدد الفليكس
++          // وoverflow الذاتي للسايد بار (overflowY:auto) مع صفحة تتمرر على مستوى
++          // body. بدل مطاردة تفاعلات CSS دقيقة وهشة، الحل الأقوى والمضمون رياضياً:
++          // position:fixed مربوط مباشرة بحواف الشاشة (top/bottom) — يثبت السايد بار
++          // بالضبط بمكانه بغض النظر عن أي تعقيد بالتمرير أو طول المحتوى، بدون أي
++          // اعتماد على سلوك sticky الحساس للسياق. المحتوى الرئيسي (main بـApp.jsx)
++          // يحجز له مساحة عبر margin-inline-start يطابق عرضه، بدل ما يشاركه بالتخطيط
++          // كعنصر عادي بالفليكس.
++          position: 'fixed', top: 'var(--topbar-h)', bottom: 0, insetInlineStart: 0, zIndex: 10,
+           overflowY: 'auto', overflowX: 'hidden', background: 'var(--surface)', display: 'flex', flexDirection: 'column',
+         }}
+       >
+diff --git a/src/real-styles.css b/src/real-styles.css
+index fb26119..2160d98 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -260,20 +260,26 @@ mark {
+ .sidebar-overlay.show { opacity: 1; }
+ .hamburger-btn { display: none; }
+ 
++/* ⚠️ إضافة مرتبطة بتحويل السايد بار لـposition:fixed (راجع Sidebar.jsx): بما إنه
++   خرج عن تدفق الصفحة العادي، ما عاد "يحجز" مساحته تلقائياً بجانب main عن طريق
++   الفليكس — لازم نحجزها يدوياً بهامش يطابق عرضه بالضبط. هذا بالوضع العادي فقط؛
++   بوضع الموبايل السايد بار overlay فوق المحتوى (مو جنبه)، فما نحتاج أي هامش هناك. */
++.app-main { margin-inline-start: var(--sidebar-w); }
++
+ @media (max-width: 880px) {
+   .hamburger-btn { display: flex !important; }
++  .app-main { margin-inline-start: 0; }
+   .app-sidebar {
+     position: fixed !important;
+     top: var(--topbar-h) !important;
+-    /* ⚠️ تصحيح خلل حقيقي: بما إن position يتحول هنا لـfixed (بدل sticky بالوضع
+-       العادي)، السايد بار يخرج تماماً عن تدفق الصفحة، فلا يعود ينطبق عليه تمدد
+-       الفليكس الأب (الحل المعتمد بالوضع العادي لتفادي الحساب اليدوي بالبكسل).
+-       بدون تحديد bottom، ارتفاعه يصير حسب المحتوى فقط (auto) — فلو المحتوى أطول
+-       من المساحة المتبقية أسفل التوب بار، يمتد تحت حافة الشاشة السفلية ويُقتطع
+-       جزء منه (غالباً زر الإعدادات/تسجيل الخروج بالأسفل) بدون إمكانية وصول له.
+-       الحل: bottom: 0 يجعل المتصفح يحسب الارتفاع تلقائياً (شاشة كاملة ناقص
+-       التوب بار) بدون أي حساب يدوي بالبكسل — نفس فلسفة تفادي التقريب أعلاه،
+-       وبهذا overflowY:auto (المُعرَّف inline بالمكوّن) يشتغل صح ويصير قابل للتمرير. */
++    /* ⚠️ ملاحظة محدَّثة: السايد بار صار fixed افتراضياً حتى بالوضع العادي (الحل
++       الأحدث — راجع Sidebar.jsx)، فـ!important هنا مو لتغيير نوع position، بس
++       لضمان الأولوية على أي تعديل inline آخر. بدون تحديد bottom هنا تحديداً،
++       ارتفاعه يصير حسب المحتوى فقط (auto) — فلو المحتوى أطول من المساحة المتبقية
++       أسفل التوب بار، يمتد تحت حافة الشاشة السفلية ويُقتطع جزء منه (غالباً زر
++       الإعدادات/تسجيل الخروج بالأسفل) بدون إمكانية وصول له. الحل: bottom: 0
++       يجعل المتصفح يحسب الارتفاع تلقائياً (شاشة كاملة ناقص التوب بار) بدون أي
++       حساب يدوي بالبكسل، وبهذا overflowY:auto يشتغل صح ويصير قابل للتمرير. */
+     left: 0;
+     bottom: 0;
+     z-index: 200;

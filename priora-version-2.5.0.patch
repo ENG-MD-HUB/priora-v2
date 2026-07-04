@@ -1,0 +1,60 @@
+diff --git a/README.md b/README.md
+index aca4c2b..3d174b3 100644
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,4 @@
+-# Priora v2.4.0 — المشروع الموحّد النهائي
++# Priora v2.5.0 — المشروع الموحّد النهائي
+ 
+ هذا هو التسليم النهائي لمشروع إعادة الهيكلة الكاملة — كل الأقسام التسعة (1 إلى 9)
+ مدمجة بمشروع Vite واحد حقيقي، جاهز للتطوير والنشر.
+diff --git a/package-lock.json b/package-lock.json
+index 32a3bd1..170463b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "priora",
+-  "version": "2.4.0",
++  "version": "2.5.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "priora",
+-      "version": "2.4.0",
++      "version": "2.5.0",
+       "dependencies": {
+         "firebase": "^10.12.0",
+         "react": "^18.3.1",
+diff --git a/package.json b/package.json
+index f4eab5b..9eeb6e3 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "priora",
+   "private": true,
+-  "version": "2.4.0",
++  "version": "2.5.0",
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+diff --git a/src/utils/appConstants.js b/src/utils/appConstants.js
+index 311ed36..7bc3888 100644
+--- a/src/utils/appConstants.js
++++ b/src/utils/appConstants.js
+@@ -4,7 +4,12 @@
+ // ⚠️ تعديل بطلب صريح: APP_VERSION كانت '2.0.0' بالكود الأصلي (لم تتحدث منذ فترة،
+ // رغم إن النسخة المنشورة فعلياً كانت تُعرض كـ"2.3.0" بمكان آخر) — حُدِّثت هنا لـ
+ // '2.4.0' لتعكس نسخة إعادة الهيكلة هذي. تظهر بشاشة تسجيل الدخول وبمودال About.
++//
++// ⚠️ رفعت لـ'2.5.0' (Semantic Versioning: MINOR لا PATCH) لأن هذا الإصدار
++// يحتوي ميزات جديدة كاملة (نظام إشعارات: تاسك جديد + فولو-أب مستحق، زر Complete
++// بجدول الورك سبيس، دمج المحذوفات بقائمة زمنية واحدة) — مو مجرد إصلاح أخطاء،
++// اللي كان يستاهل PATCH (2.4.1) فقط.
+ 
+-export const APP_VERSION = '2.4.0';
++export const APP_VERSION = '2.5.0';
+ export const APP_TAGLINE = 'Track Everything. Forget Nothing.';
+ export const STORAGE_KEY_PREFIX = 'priora_v2';

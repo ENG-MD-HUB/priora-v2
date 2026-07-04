@@ -165,7 +165,7 @@ function AuthenticatedApp() {
       <TopBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Sidebar fontScale={fontScale} />
-        <main style={{ flex: 1, padding: '18px 22px', overflow: 'auto', minWidth: 0 }}>
+        <main className="app-main" style={{ flex: 1, padding: '18px 22px', overflow: 'auto', minWidth: 0 }}>
           {showGlobalSearchInstead ? (
             <GlobalSearchPage />
           ) : (
