@@ -14,6 +14,7 @@ import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
 import { useTasksStore } from './store/tasksStore';
 import { useFoldersStore } from './store/foldersStore';
+import { useContactsStore } from './store/contactsStore';
 import { authService } from './services/authService';
 import { showToast } from './store/toastStore';
 import { performInitialSync, quickResyncWorkspaces } from './services/initialSyncService';
@@ -22,7 +23,9 @@ import { setCurrentUserId } from './utils/anonUserTracking';
 import { tasksService } from './services/tasksService';
 import { foldersService } from './services/foldersService';
 import { contactsService } from './services/contactsService';
+import { trashService } from './services/trashService';
 import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
+import { useWorkspaceFollowupNotifications } from './utils/useWorkspaceFollowupNotifications';
 import { useFontScale } from './utils/useFontScale';
 import { useIdleScreensaver } from './utils/useIdleScreensaver';
 import { Screensaver } from './components/Screensaver';
@@ -68,7 +71,47 @@ function AuthenticatedApp() {
     performInitialSync(user.uid).then((result) => {
       setFoldersFetchSucceeded(result.foldersFetchSucceeded);
       setDataLoaded(true);
+      // بعد وصول البيانات الحقيقية من Firestore (بما فيها أي عنصر "زومبي" قديم
+      // كان عالقاً هناك بسبب الخلل السابق بـexpireTrash/expireDeletedFolders)،
+      // نُعيد فحص الانتهاء فوراً — بدل انتظار إعادة تحميل تالية لالتقاطه.
+      useTasksStore.getState().expireTrash();
+      useFoldersStore.getState().expireDeletedFolders();
     });
+  }, [user?.uid]);
+
+  // ⚠️ إصلاح جذري بطلب صريح: البيانات الشخصية (tasks/folders/contacts/trash) كانت
+  // تُجلب مرة واحدة فقط عند تسجيل الدخول (performInitialSync أعلاه، عبر getDocs) —
+  // فتحديث يحصل على جهاز آخر لا ينعكس هنا إلا بإعادة تحميل كاملة للتطبيق. هذا
+  // مختلف عن تاسكات الورك سبيس، اللي تُستمع لها لحظياً بالفعل (wsTaskService.onTasks،
+  // نفس نمط WorkspaceAttentionSection.jsx).
+  //
+  // البنية التحتية اللازمة (onTasks/onFolders/onContacts/onTrash) كانت موجودة
+  // وجاهزة أصلاً بكل خدمة (نفس onUserCollection المستخدم لبيانات الورك سبيس)، لكنها
+  // لم تكن موصولة بأي مكان بالتطبيق. هذا الاشتراك اللحظي إضافة فقط، ولا يمس أو
+  // يستبدل performInitialSync (يبقى كما هو للإقلاع الأول: dataLoaded، إنشاء مجلد
+  // افتراضي، ترحيل البيانات القديمة) — فقط يُبقي البيانات محدّثة تلقائياً بعد ذلك.
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubTasks = tasksService.onTasks(user.uid, (tasks) =>
+      useTasksStore.setState((state) => ({ tasks, trash: state.trash }))
+    );
+    const unsubTrash = trashService.onTrash(user.uid, (trash) =>
+      useTasksStore.setState((state) => ({ tasks: state.tasks, trash }))
+    );
+    const unsubFolders = foldersService.onFolders(user.uid, (folders) =>
+      useFoldersStore.setState((state) => ({ folders, deletedFolders: state.deletedFolders }))
+    );
+    const unsubContacts = contactsService.onContacts(user.uid, (contacts) =>
+      useContactsStore.setState({ contacts })
+    );
+
+    return () => {
+      unsubTasks();
+      unsubTrash();
+      unsubFolders();
+      unsubContacts();
+    };
   }, [user?.uid]);
 
   // ترقية لمرة واحدة فقط: تحويل المجلدات المسطّحة القديمة لفروع تحت مجلد رئيسي
@@ -94,6 +137,7 @@ function AuthenticatedApp() {
   }, [dataLoaded, foldersFetchSucceeded, user?.uid]);
 
   useFollowupDesktopNotifications(tasks);
+  useWorkspaceFollowupNotifications(user?.uid);
 
   const isFolderView = activeView.startsWith('folder:');
   const currentFolderId = isFolderView ? activeView.slice(7) : null;

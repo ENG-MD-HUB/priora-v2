@@ -6,6 +6,7 @@
 // وإنشاء جهة اتصال جديدة inline عن طريق QuickAddContactModal لو ما لقى تطابق دقيق.
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useContactsStore } from '../store/contactsStore';
 import { QuickAddContactModal } from './QuickAddContactModal';
 
@@ -14,26 +15,45 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [prefillForNewContact, setPrefillForNewContact] = useState(null);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState(null);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
 
-  // ⚠️ إصلاح بطلب صريح: القائمة كانت تظهر دائماً تحت الحقل، حتى لو ما فيه مساحة
-  // كافية (مثلاً الحقل قريب من نهاية نافذة/مودال) — تختفي مقتطعة جزئياً. الآن نفحص
-  // المساحة المتاحة أسفل الحقل فعلياً لحظة الفتح، ولو غير كافية، تظهر القائمة فوق
-  // الحقل تلقائياً بدلاً من تحته.
+  // ⚠️ إصلاح جذري بطلب صريح (يستبدل محاولة سابقة غير كافية): القائمة كانت
+  // absolute داخل .modal-box، وهذا العنصر عنده overflow-y:auto + max-height:90vh
+  // بالتصميم (عشان المودالات الطويلة تصير قابلة للتمرير). أي عنصر absolute
+  // يتجاوز حدود .modal-box يُقتطع بصرياً — بغض النظر هل فتحناه فوق الحقل أو
+  // تحته، لأن المشكلة مو "مساحة الشاشة"، هي "حاوية أب تقص أي شي يفيض عنها".
+  // فحص "المساحة المتاحة" وحده (المحاولة السابقة) ما يكفي طالما القائمة لسا
+  // بنفس شجرة DOM المقصوصة.
+  //
+  // الحل: رندر القائمة عبر Portal مباشرة على document.body (بالضبط نفس تقنية
+  // Modal.jsx الموجودة أصلاً بالمشروع) — تصير عنصر مستقل تماماً بره أي حاوية
+  // overflow، بموضع fixed محسوب من الإحداثيات الفعلية للحقل بالشاشة (تُحسب فوق
+  // أو تحت حسب المساحة، كما بالسابق).
   function openDropdown() {
     if (inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
-      setOpenUpward(spaceBelow < 220); // 220 يطابق تقريباً ارتفاع القائمة الأقصى (maxHeight: 200 + هوامش)
+      const openUpward = spaceBelow < 220; // 220 يطابق تقريباً ارتفاع القائمة الأقصى (maxHeight: 200 + هوامش)
+      setDropdownPos({
+        left: rect.left,
+        width: rect.width,
+        ...(openUpward ? { bottom: window.innerHeight - rect.top + 3 } : { top: rect.bottom + 3 }),
+      });
     }
     setShowDropdown(true);
   }
 
   useEffect(() => {
+    // ⚠️ بما إن القائمة صارت الآن بره شجرة containerRef (Portal)، لازم نتحقق من
+    // الاثنين معاً (الحقل + القائمة) قبل الإغلاق، وإلا أي ضغطة داخل القائمة نفسها
+    // (اختيار جهة اتصال) كانت رح تُغلقها فوراً كـ"ضغطة خارجية" بالغلط.
     function handleClickOutside(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) setShowDropdown(false);
+      const insideContainer = containerRef.current && containerRef.current.contains(e.target);
+      const insideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      if (!insideContainer && !insideDropdown) setShowDropdown(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -91,13 +111,14 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
           onFocus={openDropdown}
           placeholder={selectedContacts.length ? 'Add another…' : 'Type a name…'}
         />
-        {showDropdown && (query.length >= 1 || contacts.length > 0) && (
+        {showDropdown && dropdownPos && (query.length >= 1 || contacts.length > 0) && createPortal(
           <div
+            ref={dropdownRef}
             style={{
-              position: 'absolute', left: 0, right: 0, zIndex: 200, background: 'var(--surface)',
+              position: 'fixed', left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999, background: 'var(--surface)',
               border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-lg)',
               maxHeight: 200, overflowY: 'auto',
-              ...(openUpward ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
+              ...(dropdownPos.top !== undefined ? { top: dropdownPos.top } : { bottom: dropdownPos.bottom }),
             }}
           >
             {matchingContacts.slice(0, 7).map((c) => (
@@ -144,7 +165,8 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
                 {normalizedQuery ? 'No contacts found' : 'No contacts yet'}
               </div>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

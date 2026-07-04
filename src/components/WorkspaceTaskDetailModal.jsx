@@ -10,7 +10,9 @@ import { useState } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore } from '../store/authStore';
 import { useContactsStore } from '../store/contactsStore';
+import { useTasksStore } from '../store/tasksStore';
 import { wsTaskService } from '../services/wsTaskService';
+import { tasksService } from '../services/tasksService';
 import { formatDateForDisplay } from '../utils/taskDateLogic';
 import { WorkspaceTaskUpdateModal } from './WorkspaceTaskUpdateModal';
 
@@ -27,6 +29,11 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
   const involvedContacts = (task.involvedIds ?? []).map((id) => contacts.find((c) => c.id === id)).filter(Boolean);
   const isOwner = task.ownerId === user?.uid;
 
+  // ⚠️ تصحيح خلل حقيقي (نفس فئة خلل WorkspaceTaskUpdateModal بالضبط، بس هنا):
+  // تعديل ملاحظة موجودة فعلاً (تصحيح تاريخ/نص) كان يحفظ نسخة الورك سبيس فقط —
+  // صفر مزامنة للمصدر الشخصي حتى لو كان المستخدم الحالي هو مالك التاسك نفسه.
+  // نفس الحل: كتابة مباشرة لـFirestore الشخصي من بيانات updatedTask نفسها،
+  // بشرط الملكية، بدون اعتماد على الكاش المحلي.
   async function saveEditedEntry(entryId) {
     if (!editText.trim()) return;
     const updatedTask = {
@@ -35,12 +42,24 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
     };
     updatedTask.lastUpdate = updatedTask.timeline.reduce((max, e) => (e.date > max ? e.date : max), '') || updatedTask.lastUpdate;
     await wsTaskService.save(wsId, updatedTask);
+    syncToPersonalSourceIfOwned(updatedTask);
     setEditingEntryId(null);
   }
 
   async function deleteEntry(entryId) {
     const updatedTask = { ...task, timeline: task.timeline.filter((e) => e.id !== entryId) };
     await wsTaskService.save(wsId, updatedTask);
+    syncToPersonalSourceIfOwned(updatedTask);
+  }
+
+  function syncToPersonalSourceIfOwned(updatedTask) {
+    if (updatedTask.workspaceId !== null || updatedTask.ownerId !== user?.uid) return;
+    useTasksStore.setState((state) => ({
+      tasks: state.tasks.some((t) => t.id === updatedTask.id)
+        ? state.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
+        : state.tasks,
+    }));
+    tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
   }
 
   return (

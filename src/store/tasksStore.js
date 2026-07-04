@@ -174,14 +174,32 @@ export const useTasksStore = create(
 
       /**
        * يحذف من سلة المهملات أي عنصر حُذف منذ TRASH_EXPIRY_MS أو أكثر (انتهت صلاحيته).
-       * ⚠️ تصحيح خلل حقيقي: كانت هذي الدالة تستخدم قيمة ثابتة منفصلة (86400000 = 24
-       * ساعة) بدل استيراد TRASH_EXPIRY_MS المشترك — يعني تعديل مدة سلة المهملات
-       * لشهرين سابقاً لم يكن يُطبَّق فعلياً هنا. تم ربطها بالثابت الصحيح الآن.
+       * ⚠️ تصحيح خلل حقيقي (السابق): كانت هذي الدالة تستخدم قيمة ثابتة منفصلة
+       * (86400000 = 24 ساعة) بدل استيراد TRASH_EXPIRY_MS المشترك — يعني تعديل مدة
+       * سلة المهملات لشهرين سابقاً لم يكن يُطبَّق فعلياً هنا. تم ربطها بالثابت الصحيح.
+       *
+       * ⚠️ تصحيح خلل حقيقي (جديد): هذي الدالة كانت تحذف العناصر المنتهية من الحالة
+       * المحلية فقط (set محلي) — بدون استدعاء trashService.delete() على Firestore.
+       * يعني العنصر يختفي من هذا الجهاز فقط، ويبقى "زومبي" بمستند Firestore للأبد.
+       * أي جلب لاحق كامل من Firestore (تسجيل دخول جديد على جهاز آخر، أو الاستماع
+       * اللحظي الجديد onTrash) يرجّعه للظهور من جديد — وهذا بالضبط سبب "عودة ملفات
+       * محذوفة سابقاً". الحل: نحذفه من Firestore أولاً (لكل عنصر منتهي)، بالتوازي
+       * مع تحديث الحالة المحلية — نفس نمط باقي دوال الحذف بهذا الملف بالضبط.
        */
-      expireTrash: () =>
+      expireTrash: () => {
+        const uid = useAuthStore.getState().user?.uid;
+        const expired = get().trash.filter(
+          (t) => t._deletedAt && Date.now() - new Date(t._deletedAt).getTime() >= TRASH_EXPIRY_MS
+        );
+
         set((state) => ({
           trash: state.trash.filter((t) => !t._deletedAt || Date.now() - new Date(t._deletedAt).getTime() < TRASH_EXPIRY_MS),
-        })),
+        }));
+
+        if (uid && !_disableFirestoreSyncForTesting) {
+          expired.forEach((t) => trashService.delete(uid, t.id).catch(console.error));
+        }
+      },
 
       shareTaskToWs: (taskId, wsId) => {
         set((state) => ({

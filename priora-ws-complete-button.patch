@@ -1,0 +1,64 @@
+diff --git a/src/components/WorkspaceTaskRow.jsx b/src/components/WorkspaceTaskRow.jsx
+index a4673d8..e89f8bf 100644
+--- a/src/components/WorkspaceTaskRow.jsx
++++ b/src/components/WorkspaceTaskRow.jsx
+@@ -4,10 +4,12 @@
+ // الفردي (ownerId === currentUser)، وليس لكل أعضاء الورك سبيس.
+ 
+ import { useAuthStore } from '../store/authStore';
++import { useTasksStore } from '../store/tasksStore';
+ import { isTaskOverdue, daysSince, wasUpdatedToday, formatDateForDisplay, isToday } from '../utils/taskDateLogic';
+ import { getDaysSinceColor, getFollowupDateColor } from '../utils/taskColors';
+ import { highlightMatch } from '../utils/highlightMatch';
+ import { wsTaskService } from '../services/wsTaskService';
++import { tasksService } from '../services/tasksService';
+ import { showToast } from '../store/toastStore';
+ 
+ export const WS_TASK_ROW_GRID_COLUMNS = 'minmax(180px,2.5fr) minmax(160px,3fr) 120px 130px 150px 110px';
+@@ -25,6 +27,26 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+   const highlightedName = searchQ ? highlightMatch(task.name, searchQ) : undefined;
+   const highlightedNote = searchQ ? highlightMatch(latestNote, searchQ) : undefined;
+ 
++  // ⚠️ إضافة بطلب صريح: زر "Complete" ما كان موجود بجدول تاسكات الورك سبيس
++  // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow). النقر يُغلق
++  // التاسك بنسخة الورك سبيس دائماً، وبالإضافة — لو هذا تاسك شخصي مُشارَك
++  // (workspaceId === null) والمستخدم الحالي هو مالكه — يُحدَّث المصدر الشخصي
++  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal (كتابة مباشرة من
++  // بيانات التاسك نفسها، بدون اعتماد على وجوده بالكاش المحلي أولاً).
++  function handleComplete() {
++    const closedTask = { ...task, status: 'closed' };
++    wsTaskService.save(wsId, closedTask).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
++
++    if (task.workspaceId === null && task.ownerId === user?.uid) {
++      useTasksStore.setState((state) => ({
++        tasks: state.tasks.some((t) => t.id === task.id)
++          ? state.tasks.map((t) => (t.id === task.id ? { ...t, status: 'closed' } : t))
++          : state.tasks,
++      }));
++      tasksService.save(user.uid, closedTask).catch((err) => console.warn('personal sync:', err));
++    }
++  }
++
+   return (
+     <div className={`task-row${overdue ? ' overdue' : ''}`} style={{ gridTemplateColumns: WS_TASK_ROW_GRID_COLUMNS, cursor: 'pointer' }} onClick={onDetail} onContextMenu={onCtx}>
+       <div style={{ padding: '9px 12px', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+@@ -82,6 +104,19 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+             Update
+           </button>
+         )}
++        {task.status !== 'closed' && (
++          <button
++            onClick={(e) => { e.stopPropagation(); handleComplete(); }}
++            title="Mark complete"
++            style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 5, cursor: 'pointer', color: 'var(--text3)', transition: 'all .12s', flexShrink: 0 }}
++            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
++            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text3)'; }}
++          >
++            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
++              <polyline points="20 6 9 17 4 12" />
++            </svg>
++          </button>
++        )}
+       </div>
+     </div>
+   );

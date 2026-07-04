@@ -225,7 +225,7 @@ export function WorkspaceDetailPage({ ws, onBack, onSwitch, initialDetailTaskId,
         </div>
       )}
 
-      {showNewTaskModal && <NewWorkspaceTaskModal wsId={ws.id} onClose={() => setShowNewTaskModal(false)} />}
+      {showNewTaskModal && <NewWorkspaceTaskModal wsId={ws.id} wsName={ws.name} onClose={() => setShowNewTaskModal(false)} />}
 
       {updatingTaskId && !detailTask && lastUpdatedTaskRef.current && (
         <WorkspaceTaskUpdateModal task={lastUpdatedTaskRef.current} wsId={ws.id} wsName={ws.name} onClose={() => setUpdatingTaskId(null)} />

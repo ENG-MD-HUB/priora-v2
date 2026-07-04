@@ -16,10 +16,11 @@ import { Modal } from './Modal';
 import { useAuthStore } from '../store/authStore';
 import { useContactsStore } from '../store/contactsStore';
 import { wsTaskService } from '../services/wsTaskService';
+import { notificationService } from '../services/notificationService';
 import { showToast } from '../store/toastStore';
 import { generateId } from '../utils/generateId';
 
-export function NewWorkspaceTaskModal({ wsId, onClose }) {
+export function NewWorkspaceTaskModal({ wsId, wsName, onClose }) {
   const user = useAuthStore((s) => s.user);
   const contacts = useContactsStore((s) => s.contacts);
 
@@ -62,6 +63,18 @@ export function NewWorkspaceTaskModal({ wsId, onClose }) {
       await wsTaskService.save(wsId, newTask);
       showToast('Task added');
       onClose();
+      notificationService
+        .add(wsId, {
+          type: 'new_task',
+          wsId,
+          wsName,
+          taskId: newTask.id,
+          taskName: newTask.name,
+          authorId: user.uid,
+          authorName: user.displayName ?? 'Unknown',
+          text: newTask.desc || '',
+        })
+        .catch((err) => console.warn('notif:', err));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('permission') || message.includes('PERMISSION_DENIED')) {

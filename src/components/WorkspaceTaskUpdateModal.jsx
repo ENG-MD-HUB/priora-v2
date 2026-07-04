@@ -68,6 +68,7 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
 
     notificationService
       .add(wsId, {
+        type: 'update',
         wsId,
         wsName,
         taskId: task.id,

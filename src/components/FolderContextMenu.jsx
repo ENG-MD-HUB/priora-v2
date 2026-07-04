@@ -11,6 +11,7 @@
 // إغلاقها فوراً (لأن click خارجي قد يُسجَّل كجزء من نفس سلسلة الأحداث).
 
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 
 export function FolderContextMenu({ folder, x, y, onClose, onRename, onDelete, onAddSubfolder, canDelete, isRoot }) {
@@ -34,7 +35,16 @@ export function FolderContextMenu({ folder, x, y, onClose, onRename, onDelete, o
     };
   }, [onClose]);
 
-  return (
+  // ⚠️ إصلاح جذري بطلب صريح: القائمة كانت تُرندر كعنصر عادي داخل <aside
+  // className="app-sidebar">، وهذا العنصر عنده position:sticky. أي ancestor عنده
+  // sticky/transform/filter/backdrop-filter/will-change يصير "containing block"
+  // لأي descendant عنده position:fixed تحته — يعني z-index:9999 هنا كان يُقيَّم
+  // محلياً بس داخل نطاق السايد بار، مو مقابل الصفحة كاملة. النتيجة: عناصر من
+  // منطقة المحتوى الرئيسي (main) كانت تظهر فوق القائمة رغم z-index العالي.
+  //
+  // الحل: نفس تقنية Modal.jsx بالضبط (createPortal لـdocument.body) — يهرب كلياً
+  // من أي containing block محلي، ويضمن ترتيب طبقات صحيح مقابل الصفحة كاملة.
+  return createPortal(
     <div
       ref={menuRef}
       className="ctx-menu"
@@ -58,6 +68,7 @@ export function FolderContextMenu({ folder, x, y, onClose, onRename, onDelete, o
           Can't delete last main folder
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

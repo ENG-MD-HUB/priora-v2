@@ -1,0 +1,94 @@
+diff --git a/src/utils/useWorkspaceFollowupNotifications.js b/src/utils/useWorkspaceFollowupNotifications.js
+index 4b27417..c858115 100644
+--- a/src/utils/useWorkspaceFollowupNotifications.js
++++ b/src/utils/useWorkspaceFollowupNotifications.js
+@@ -11,6 +11,14 @@
+ // إشعار مكرر بقائمة الجرس لكل الأعضاء، نستخدم id ثابت محسوب من (taskId + التاريخ)
+ // بدل id عشوائي — فكل الأجهزة تكتب لنفس المستند بالضبط، ولا يتكرر الإشعار مهما
+ // تعدد الأجهزة اللي اكتشفته بنفس اليوم.
++//
++// ⚠️ تحسين كفاءة بطلب صريح: onTasks يُطلق مع أي تغيير على أي تاسك بالورك سبيس
++// (مو بس لما يصير الاستحقاق) — فبدون حارس محلي، نفس التاسك المستحق كان يُعاد
++// كتابته لـFirestore بكل مرة يتغيّر فيها أي شي ثاني بالورك سبيس (تكلفة كتابة
++// زايدة بدون داعٍ، رغم إن الـid الثابت يمنع ظهور تكرار بصري). الحل: نفس حارس
++// "priora_ws_notif_sent_{today}" المستخدم أصلاً لإشعار سطح المكتب صار يُطبَّق
++// أيضاً قبل الكتابة لـFirestore — يعني كل جهاز يكتب كل تاسك مستحق **مرة وحدة
++// بالضبط باليوم**، بدل إعادة الكتابة بكل تحديث.
+ 
+ import { useEffect } from 'react';
+ import { useWorkspacesStore } from './../store/workspacesStore';
+@@ -31,8 +39,23 @@ export function useWorkspaceFollowupNotifications(uid) {
+         const dueTasks = tasks.filter((t) => t.status !== 'closed' && t.nextFollowup === today);
+         if (dueTasks.length === 0) return;
+ 
+-        // إشعار داخل التطبيق (id ثابت — راجع الملاحظة أعلى الملف لسبب هذا تحديداً).
+-        dueTasks.forEach((task) => {
++        // حارس محلي واحد (لكل جهاز/يوم) يُبوّب أي تاسك سبق وأُرسِل له إشعار
++        // اليوم — يُستخدم لبوابة كتابة Firestore وإشعار سطح المكتب معاً، بدل
++        // تكراره لكل واحد لحاله.
++        const sentKey = `priora_ws_notif_sent_${today}`;
++        let alreadySent;
++        try {
++          alreadySent = JSON.parse(localStorage.getItem(sentKey) || '[]');
++        } catch {
++          alreadySent = [];
++        }
++
++        const newlyDue = dueTasks.filter((t) => !alreadySent.includes(t.id));
++        if (newlyDue.length === 0) return;
++
++        // إشعار داخل التطبيق (id ثابت — راجع الملاحظة أعلى الملف لسبب هذا تحديداً)
++        // — الآن مرة وحدة فقط لكل تاسك جديد الاستحقاق، مو بكل تحديث.
++        newlyDue.forEach((task) => {
+           notificationService
+             .add(
+               ws.id,
+@@ -51,33 +74,24 @@ export function useWorkspaceFollowupNotifications(uid) {
+             .catch((err) => console.warn('followup notif:', err));
+         });
+ 
+-        // إشعار سطح مكتب حقيقي — نفس منطق الهوك الشخصي بالضبط، بس بمفتاح محلي
+-        // منفصل (priora_ws_notif_sent_...) حتى ما يتعارض مع دِدوب التاسكات الشخصية.
+-        if (typeof Notification === 'undefined') return;
+-        if (Notification.permission === 'default') Notification.requestPermission();
+-        if (Notification.permission !== 'granted') return;
+-
+-        const sentKey = `priora_ws_notif_sent_${today}`;
+-        let alreadySent;
+-        try {
+-          alreadySent = JSON.parse(localStorage.getItem(sentKey) || '[]');
+-        } catch {
+-          alreadySent = [];
+-        }
+-
+-        const notYetNotifiedLocally = dueTasks.filter((t) => !alreadySent.includes(t.id));
+-        if (notYetNotifiedLocally.length === 0) return;
+-
+-        notYetNotifiedLocally.forEach((task) => {
+-          try {
+-            new Notification('Priora — Follow-up due', { body: `${task.name} (${ws.name})`, tag: `priora-ws-${task.id}` });
+-          } catch {
+-            // فشل إنشاء إشعار واحد لا يوقف الباقي.
++        // إشعار سطح مكتب حقيقي — نفس منطق الهوك الشخصي بالضبط.
++        if (typeof Notification !== 'undefined') {
++          if (Notification.permission === 'default') Notification.requestPermission();
++          if (Notification.permission === 'granted') {
++            newlyDue.forEach((task) => {
++              try {
++                new Notification('Priora — Follow-up due', { body: `${task.name} (${ws.name})`, tag: `priora-ws-${task.id}` });
++              } catch {
++                // فشل إنشاء إشعار واحد لا يوقف الباقي.
++              }
++            });
+           }
+-        });
++        }
+ 
++        // نسجّل كل تاسك بالحارس المحلي بعد أول مرة يُعالَج فيها — بغض النظر هل
++        // نجح إشعار سطح المكتب أو لا (النجاح بالجرس/Firestore هو الأهم هنا).
+         try {
+-          localStorage.setItem(sentKey, JSON.stringify([...alreadySent, ...notYetNotifiedLocally.map((t) => t.id)]));
++          localStorage.setItem(sentKey, JSON.stringify([...alreadySent, ...newlyDue.map((t) => t.id)]));
+         } catch {
+           // فشل الكتابة بـlocalStorage ليس خطأ حرج هنا.
+         }

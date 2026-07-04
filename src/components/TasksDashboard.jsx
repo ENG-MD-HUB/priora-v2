@@ -59,10 +59,6 @@ export function TasksDashboard({ lang = 'en', setActiveView = () => {}, setFilte
           label={getDashboardLabel(lang, 'urgentTasks')}
           value={urgent.length}
           color="var(--red)"
-          onClick={() => {
-            setActiveView('projects');
-            setFilterStatus('urgent');
-          }}
           icon={
             <svg width="16" height="16" viewBox="0 0 14 14" fill="currentColor">
               <polygon points="7,1 13,13 1,13" />
@@ -73,7 +69,6 @@ export function TasksDashboard({ lang = 'en', setActiveView = () => {}, setFilte
           label={getDashboardLabel(lang, 'overdueItems')}
           value={overdue.length}
           color="var(--orange)"
-          onClick={() => setFilterStatus('overdue')}
           icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="12" cy="12" r="10" />
@@ -85,7 +80,6 @@ export function TasksDashboard({ lang = 'en', setActiveView = () => {}, setFilte
         <StatCard
           label={getDashboardLabel(lang, 'activeTasks')}
           value={openTasks.length}
-          onClick={() => setActiveView('projects')}
           icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -95,10 +89,6 @@ export function TasksDashboard({ lang = 'en', setActiveView = () => {}, setFilte
         <StatCard
           label={getDashboardLabel(lang, 'waitingFeedback')}
           value={waiting.length}
-          onClick={() => {
-            setActiveView('requests');
-            setFilterStatus('waiting');
-          }}
           icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="12" cy="12" r="10" />
@@ -109,7 +99,6 @@ export function TasksDashboard({ lang = 'en', setActiveView = () => {}, setFilte
         <StatCard
           label={getDashboardLabel(lang, 'completedItems')}
           value={completed.length}
-          onClick={() => setActiveView('completed')}
           icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <polyline points="20 6 9 17 4 12" />

@@ -12,6 +12,34 @@ import { useWorkspacesStore } from '../store/workspacesStore';
 import { notificationService } from '../services/notificationService';
 import { formatDateForDisplay } from '../utils/taskDateLogic';
 
+// ⚠️ إضافة بطلب صريح: نص مختلف لكل نوع إشعار (تحديث / تاسك جديد / فولو-أب
+// مستحق)، لكن بنفس البنية والألوان تماماً (نفس التنسيق البصري) — عشان ما يصير
+// تشتت بصري بين الأنواع، الفرق الوحيد هو النص نفسه.
+function renderNotificationLine(n) {
+  if (n.type === 'new_task') {
+    return (
+      <>
+        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.authorName}</span> added a new task{' '}
+        <span style={{ fontWeight: 500, color: 'var(--text)' }}>{n.taskName}</span>
+      </>
+    );
+  }
+  if (n.type === 'followup_due') {
+    return (
+      <>
+        Follow-up due today: <span style={{ fontWeight: 500, color: 'var(--text)' }}>{n.taskName}</span>
+      </>
+    );
+  }
+  // 'update' (الافتراضي — يشمل إشعارات قديمة بدون حقل type أصلاً)
+  return (
+    <>
+      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.authorName}</span> updated{' '}
+      <span style={{ fontWeight: 500, color: 'var(--text)' }}>{n.taskName}</span>
+    </>
+  );
+}
+
 export function NotificationBell() {
   const user = useAuthStore((s) => s.user);
   const workspaces = useWorkspacesStore((s) => s.workspaces);
@@ -137,11 +165,12 @@ export function NotificationBell() {
                       {isUnread && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: 5 }} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 2 }}>
-                          <span style={{ fontWeight: 600, color: 'var(--text)' }}>{notification.authorName}</span> updated{' '}
-                          <span style={{ fontWeight: 500, color: 'var(--text)' }}>{notification.taskName}</span>
+                          {renderNotificationLine(notification)}
                           <span style={{ color: 'var(--text3)', marginInlineStart: 4, fontSize: 11 }}>· {notification.wsName}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notification.text}</div>
+                        {notification.text && (
+                          <div style={{ fontSize: 12, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notification.text}</div>
+                        )}
                         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(notification.createdAt.split('T')[0])}</div>
                       </div>
                     </div>

@@ -1,0 +1,288 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index fa2e16a..8c6e570 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -14,6 +14,7 @@ import { useAuthStore } from './store/authStore';
+ import { useUIStore } from './store/uiStore';
+ import { useTasksStore } from './store/tasksStore';
+ import { useFoldersStore } from './store/foldersStore';
++import { useContactsStore } from './store/contactsStore';
+ import { authService } from './services/authService';
+ import { showToast } from './store/toastStore';
+ import { performInitialSync, quickResyncWorkspaces } from './services/initialSyncService';
+@@ -22,6 +23,7 @@ import { setCurrentUserId } from './utils/anonUserTracking';
+ import { tasksService } from './services/tasksService';
+ import { foldersService } from './services/foldersService';
+ import { contactsService } from './services/contactsService';
++import { trashService } from './services/trashService';
+ import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
+ import { useFontScale } from './utils/useFontScale';
+ import { useIdleScreensaver } from './utils/useIdleScreensaver';
+@@ -68,9 +70,49 @@ function AuthenticatedApp() {
+     performInitialSync(user.uid).then((result) => {
+       setFoldersFetchSucceeded(result.foldersFetchSucceeded);
+       setDataLoaded(true);
++      // بعد وصول البيانات الحقيقية من Firestore (بما فيها أي عنصر "زومبي" قديم
++      // كان عالقاً هناك بسبب الخلل السابق بـexpireTrash/expireDeletedFolders)،
++      // نُعيد فحص الانتهاء فوراً — بدل انتظار إعادة تحميل تالية لالتقاطه.
++      useTasksStore.getState().expireTrash();
++      useFoldersStore.getState().expireDeletedFolders();
+     });
+   }, [user?.uid]);
+ 
++  // ⚠️ إصلاح جذري بطلب صريح: البيانات الشخصية (tasks/folders/contacts/trash) كانت
++  // تُجلب مرة واحدة فقط عند تسجيل الدخول (performInitialSync أعلاه، عبر getDocs) —
++  // فتحديث يحصل على جهاز آخر لا ينعكس هنا إلا بإعادة تحميل كاملة للتطبيق. هذا
++  // مختلف عن تاسكات الورك سبيس، اللي تُستمع لها لحظياً بالفعل (wsTaskService.onTasks،
++  // نفس نمط WorkspaceAttentionSection.jsx).
++  //
++  // البنية التحتية اللازمة (onTasks/onFolders/onContacts/onTrash) كانت موجودة
++  // وجاهزة أصلاً بكل خدمة (نفس onUserCollection المستخدم لبيانات الورك سبيس)، لكنها
++  // لم تكن موصولة بأي مكان بالتطبيق. هذا الاشتراك اللحظي إضافة فقط، ولا يمس أو
++  // يستبدل performInitialSync (يبقى كما هو للإقلاع الأول: dataLoaded، إنشاء مجلد
++  // افتراضي، ترحيل البيانات القديمة) — فقط يُبقي البيانات محدّثة تلقائياً بعد ذلك.
++  useEffect(() => {
++    if (!user) return;
++
++    const unsubTasks = tasksService.onTasks(user.uid, (tasks) =>
++      useTasksStore.setState((state) => ({ tasks, trash: state.trash }))
++    );
++    const unsubTrash = trashService.onTrash(user.uid, (trash) =>
++      useTasksStore.setState((state) => ({ tasks: state.tasks, trash }))
++    );
++    const unsubFolders = foldersService.onFolders(user.uid, (folders) =>
++      useFoldersStore.setState((state) => ({ folders, deletedFolders: state.deletedFolders }))
++    );
++    const unsubContacts = contactsService.onContacts(user.uid, (contacts) =>
++      useContactsStore.setState({ contacts })
++    );
++
++    return () => {
++      unsubTasks();
++      unsubTrash();
++      unsubFolders();
++      unsubContacts();
++    };
++  }, [user?.uid]);
++
+   // ترقية لمرة واحدة فقط: تحويل المجلدات المسطّحة القديمة لفروع تحت مجلد رئيسي
+   // جديد اسمه "General" — راجع migrateFoldersToSubfolders.js للتفاصيل الكاملة
+   // وضمانات السلامة (لا تتكرر، ولا تعمل فوق بيانات مُرحَّلة فعلاً من جهاز آخر).
+diff --git a/src/components/EditTaskModal.jsx b/src/components/EditTaskModal.jsx
+index c14e2a6..9fbb8f0 100644
+--- a/src/components/EditTaskModal.jsx
++++ b/src/components/EditTaskModal.jsx
+@@ -8,7 +8,7 @@ import { useState } from 'react';
+ import { Modal } from './Modal';
+ import { useTasksStore } from '../store/tasksStore';
+ import { showToast } from '../store/toastStore';
+-import { InvolvedContactsPicker } from './InvolvedContactsPicker';
++import { InvolvedContactsTypeahead } from './InvolvedContactsTypeahead';
+ import { getEffectiveToday } from '../utils/taskDateLogic';
+ 
+ export function EditTaskModal({ task, onClose }) {
+@@ -99,7 +99,7 @@ export function EditTaskModal({ task, onClose }) {
+ 
+           <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
+             <label className="label">Involved</label>
+-            <InvolvedContactsPicker value={involvedIds} onChange={setInvolvedIds} />
++            <InvolvedContactsTypeahead value={involvedIds} onChange={setInvolvedIds} />
+           </div>
+         </div>
+ 
+diff --git a/src/components/InvolvedContactsTypeahead.jsx b/src/components/InvolvedContactsTypeahead.jsx
+index e9142af..297b5b3 100644
+--- a/src/components/InvolvedContactsTypeahead.jsx
++++ b/src/components/InvolvedContactsTypeahead.jsx
+@@ -6,6 +6,7 @@
+ // وإنشاء جهة اتصال جديدة inline عن طريق QuickAddContactModal لو ما لقى تطابق دقيق.
+ 
+ import { useState, useRef, useEffect } from 'react';
++import { createPortal } from 'react-dom';
+ import { useContactsStore } from '../store/contactsStore';
+ import { QuickAddContactModal } from './QuickAddContactModal';
+ 
+@@ -14,26 +15,45 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
+   const [query, setQuery] = useState('');
+   const [showDropdown, setShowDropdown] = useState(false);
+   const [prefillForNewContact, setPrefillForNewContact] = useState(null);
+-  const [openUpward, setOpenUpward] = useState(false);
++  const [dropdownPos, setDropdownPos] = useState(null);
+   const containerRef = useRef(null);
+   const inputRef = useRef(null);
++  const dropdownRef = useRef(null);
+ 
+-  // ⚠️ إصلاح بطلب صريح: القائمة كانت تظهر دائماً تحت الحقل، حتى لو ما فيه مساحة
+-  // كافية (مثلاً الحقل قريب من نهاية نافذة/مودال) — تختفي مقتطعة جزئياً. الآن نفحص
+-  // المساحة المتاحة أسفل الحقل فعلياً لحظة الفتح، ولو غير كافية، تظهر القائمة فوق
+-  // الحقل تلقائياً بدلاً من تحته.
++  // ⚠️ إصلاح جذري بطلب صريح (يستبدل محاولة سابقة غير كافية): القائمة كانت
++  // absolute داخل .modal-box، وهذا العنصر عنده overflow-y:auto + max-height:90vh
++  // بالتصميم (عشان المودالات الطويلة تصير قابلة للتمرير). أي عنصر absolute
++  // يتجاوز حدود .modal-box يُقتطع بصرياً — بغض النظر هل فتحناه فوق الحقل أو
++  // تحته، لأن المشكلة مو "مساحة الشاشة"، هي "حاوية أب تقص أي شي يفيض عنها".
++  // فحص "المساحة المتاحة" وحده (المحاولة السابقة) ما يكفي طالما القائمة لسا
++  // بنفس شجرة DOM المقصوصة.
++  //
++  // الحل: رندر القائمة عبر Portal مباشرة على document.body (بالضبط نفس تقنية
++  // Modal.jsx الموجودة أصلاً بالمشروع) — تصير عنصر مستقل تماماً بره أي حاوية
++  // overflow، بموضع fixed محسوب من الإحداثيات الفعلية للحقل بالشاشة (تُحسب فوق
++  // أو تحت حسب المساحة، كما بالسابق).
+   function openDropdown() {
+     if (inputRef.current) {
+       const rect = inputRef.current.getBoundingClientRect();
+       const spaceBelow = window.innerHeight - rect.bottom;
+-      setOpenUpward(spaceBelow < 220); // 220 يطابق تقريباً ارتفاع القائمة الأقصى (maxHeight: 200 + هوامش)
++      const openUpward = spaceBelow < 220; // 220 يطابق تقريباً ارتفاع القائمة الأقصى (maxHeight: 200 + هوامش)
++      setDropdownPos({
++        left: rect.left,
++        width: rect.width,
++        ...(openUpward ? { bottom: window.innerHeight - rect.top + 3 } : { top: rect.bottom + 3 }),
++      });
+     }
+     setShowDropdown(true);
+   }
+ 
+   useEffect(() => {
++    // ⚠️ بما إن القائمة صارت الآن بره شجرة containerRef (Portal)، لازم نتحقق من
++    // الاثنين معاً (الحقل + القائمة) قبل الإغلاق، وإلا أي ضغطة داخل القائمة نفسها
++    // (اختيار جهة اتصال) كانت رح تُغلقها فوراً كـ"ضغطة خارجية" بالغلط.
+     function handleClickOutside(e) {
+-      if (containerRef.current && !containerRef.current.contains(e.target)) setShowDropdown(false);
++      const insideContainer = containerRef.current && containerRef.current.contains(e.target);
++      const insideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
++      if (!insideContainer && !insideDropdown) setShowDropdown(false);
+     }
+     document.addEventListener('mousedown', handleClickOutside);
+     return () => document.removeEventListener('mousedown', handleClickOutside);
+@@ -91,13 +111,14 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
+           onFocus={openDropdown}
+           placeholder={selectedContacts.length ? 'Add another…' : 'Type a name…'}
+         />
+-        {showDropdown && (query.length >= 1 || contacts.length > 0) && (
++        {showDropdown && dropdownPos && (query.length >= 1 || contacts.length > 0) && createPortal(
+           <div
++            ref={dropdownRef}
+             style={{
+-              position: 'absolute', left: 0, right: 0, zIndex: 200, background: 'var(--surface)',
++              position: 'fixed', left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999, background: 'var(--surface)',
+               border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-lg)',
+               maxHeight: 200, overflowY: 'auto',
+-              ...(openUpward ? { bottom: '100%', marginBottom: 3 } : { top: '100%', marginTop: 3 }),
++              ...(dropdownPos.top !== undefined ? { top: dropdownPos.top } : { bottom: dropdownPos.bottom }),
+             }}
+           >
+             {matchingContacts.slice(0, 7).map((c) => (
+@@ -144,7 +165,8 @@ export function InvolvedContactsTypeahead({ value, onChange }) {
+                 {normalizedQuery ? 'No contacts found' : 'No contacts yet'}
+               </div>
+             )}
+-          </div>
++          </div>,
++          document.body
+         )}
+       </div>
+ 
+diff --git a/src/real-styles.css b/src/real-styles.css
+index 3c608b9..79ef35d 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -254,10 +254,17 @@ mark {
+   .app-sidebar {
+     position: fixed !important;
+     top: var(--topbar-h) !important;
++    /* ⚠️ تصحيح خلل حقيقي: بما إن position يتحول هنا لـfixed (بدل sticky بالوضع
++       العادي)، السايد بار يخرج تماماً عن تدفق الصفحة، فلا يعود ينطبق عليه تمدد
++       الفليكس الأب (الحل المعتمد بالوضع العادي لتفادي الحساب اليدوي بالبكسل).
++       بدون تحديد bottom، ارتفاعه يصير حسب المحتوى فقط (auto) — فلو المحتوى أطول
++       من المساحة المتبقية أسفل التوب بار، يمتد تحت حافة الشاشة السفلية ويُقتطع
++       جزء منه (غالباً زر الإعدادات/تسجيل الخروج بالأسفل) بدون إمكانية وصول له.
++       الحل: bottom: 0 يجعل المتصفح يحسب الارتفاع تلقائياً (شاشة كاملة ناقص
++       التوب بار) بدون أي حساب يدوي بالبكسل — نفس فلسفة تفادي التقريب أعلاه،
++       وبهذا overflowY:auto (المُعرَّف inline بالمكوّن) يشتغل صح ويصير قابل للتمرير. */
+     left: 0;
+-    /* الارتفاع يُحسب الآن inline بـSidebar.jsx عبر useViewportHeight (JS حقيقي)
+-       بدل 100vh CSS — هذا يحمي من تشوّه التخطيط عند تغيير حجم الخط (zoom).
+-       لا نضع height هنا عمداً، لنسمح للقيمة inline (أعلى أولوية بدون !important) تُطبَّق. */
++    bottom: 0;
+     z-index: 200;
+     transform: translateX(-100%);
+     transition: transform .25s ease;
+diff --git a/src/store/foldersStore.js b/src/store/foldersStore.js
+index 8e6fd58..2ebab0b 100644
+--- a/src/store/foldersStore.js
++++ b/src/store/foldersStore.js
+@@ -184,13 +184,29 @@ export const useFoldersStore = create(
+        * يحذف نهائياً (بدون إمكانية استعادة) أي مجلد بـ deletedFolders تجاوز مدة
+        * الاحتفاظ (نفس مدة سلة مهملات التاسكات — TRASH_EXPIRY_MS، حالياً شهرين).
+        * يُستدعى بنفس توقيت expireTrash بـ tasksStore (راجع App.jsx).
++       *
++       * ⚠️ تصحيح خلل حقيقي (نفس خلل expireTrash بـ tasksStore بالضبط): كانت تحذف
++       * من الحالة المحلية فقط، بدون deletedFoldersService.delete() على Firestore —
++       * فيبقى المجلد "زومبي" هناك للأبد، ويرجع يظهر من جديد بأي جلب/استماع لاحق
++       * لكامل بيانات المستخدم. الحل: حذف Firestore أولاً لكل مجلد منتهي، بالتوازي
++       * مع تحديث الحالة المحلية.
+        */
+-      expireDeletedFolders: () =>
++      expireDeletedFolders: () => {
++        const uid = useAuthStore.getState().user?.uid;
++        const expired = get().deletedFolders.filter(
++          (f) => f._deletedAt && Date.now() - new Date(f._deletedAt).getTime() >= TRASH_EXPIRY_MS
++        );
++
+         set((state) => ({
+           deletedFolders: state.deletedFolders.filter(
+             (f) => !f._deletedAt || Date.now() - new Date(f._deletedAt).getTime() < TRASH_EXPIRY_MS
+           ),
+-        })),
++        }));
++
++        if (uid && !_disableFirestoreSyncForTesting) {
++          expired.forEach((f) => deletedFoldersService.delete(uid, f.id).catch(console.error));
++        }
++      },
+     }),
+     {
+       name: buildStorageKey('folders'),
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index 524bdee..321ad7e 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -174,14 +174,32 @@ export const useTasksStore = create(
+ 
+       /**
+        * يحذف من سلة المهملات أي عنصر حُذف منذ TRASH_EXPIRY_MS أو أكثر (انتهت صلاحيته).
+-       * ⚠️ تصحيح خلل حقيقي: كانت هذي الدالة تستخدم قيمة ثابتة منفصلة (86400000 = 24
+-       * ساعة) بدل استيراد TRASH_EXPIRY_MS المشترك — يعني تعديل مدة سلة المهملات
+-       * لشهرين سابقاً لم يكن يُطبَّق فعلياً هنا. تم ربطها بالثابت الصحيح الآن.
++       * ⚠️ تصحيح خلل حقيقي (السابق): كانت هذي الدالة تستخدم قيمة ثابتة منفصلة
++       * (86400000 = 24 ساعة) بدل استيراد TRASH_EXPIRY_MS المشترك — يعني تعديل مدة
++       * سلة المهملات لشهرين سابقاً لم يكن يُطبَّق فعلياً هنا. تم ربطها بالثابت الصحيح.
++       *
++       * ⚠️ تصحيح خلل حقيقي (جديد): هذي الدالة كانت تحذف العناصر المنتهية من الحالة
++       * المحلية فقط (set محلي) — بدون استدعاء trashService.delete() على Firestore.
++       * يعني العنصر يختفي من هذا الجهاز فقط، ويبقى "زومبي" بمستند Firestore للأبد.
++       * أي جلب لاحق كامل من Firestore (تسجيل دخول جديد على جهاز آخر، أو الاستماع
++       * اللحظي الجديد onTrash) يرجّعه للظهور من جديد — وهذا بالضبط سبب "عودة ملفات
++       * محذوفة سابقاً". الحل: نحذفه من Firestore أولاً (لكل عنصر منتهي)، بالتوازي
++       * مع تحديث الحالة المحلية — نفس نمط باقي دوال الحذف بهذا الملف بالضبط.
+        */
+-      expireTrash: () =>
++      expireTrash: () => {
++        const uid = useAuthStore.getState().user?.uid;
++        const expired = get().trash.filter(
++          (t) => t._deletedAt && Date.now() - new Date(t._deletedAt).getTime() >= TRASH_EXPIRY_MS
++        );
++
+         set((state) => ({
+           trash: state.trash.filter((t) => !t._deletedAt || Date.now() - new Date(t._deletedAt).getTime() < TRASH_EXPIRY_MS),
+-        })),
++        }));
++
++        if (uid && !_disableFirestoreSyncForTesting) {
++          expired.forEach((t) => trashService.delete(uid, t.id).catch(console.error));
++        }
++      },
+ 
+       shareTaskToWs: (taskId, wsId) => {
+         set((state) => ({

@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Modal } from './Modal';
 import { useTasksStore } from '../store/tasksStore';
 import { showToast } from '../store/toastStore';
-import { InvolvedContactsPicker } from './InvolvedContactsPicker';
+import { InvolvedContactsTypeahead } from './InvolvedContactsTypeahead';
 import { getEffectiveToday } from '../utils/taskDateLogic';
 
 export function EditTaskModal({ task, onClose }) {
@@ -99,7 +99,7 @@ export function EditTaskModal({ task, onClose }) {
 
           <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
             <label className="label">Involved</label>
-            <InvolvedContactsPicker value={involvedIds} onChange={setInvolvedIds} />
+            <InvolvedContactsTypeahead value={involvedIds} onChange={setInvolvedIds} />
           </div>
         </div>
 

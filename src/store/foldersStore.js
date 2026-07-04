@@ -184,13 +184,29 @@ export const useFoldersStore = create(
        * يحذف نهائياً (بدون إمكانية استعادة) أي مجلد بـ deletedFolders تجاوز مدة
        * الاحتفاظ (نفس مدة سلة مهملات التاسكات — TRASH_EXPIRY_MS، حالياً شهرين).
        * يُستدعى بنفس توقيت expireTrash بـ tasksStore (راجع App.jsx).
+       *
+       * ⚠️ تصحيح خلل حقيقي (نفس خلل expireTrash بـ tasksStore بالضبط): كانت تحذف
+       * من الحالة المحلية فقط، بدون deletedFoldersService.delete() على Firestore —
+       * فيبقى المجلد "زومبي" هناك للأبد، ويرجع يظهر من جديد بأي جلب/استماع لاحق
+       * لكامل بيانات المستخدم. الحل: حذف Firestore أولاً لكل مجلد منتهي، بالتوازي
+       * مع تحديث الحالة المحلية.
        */
-      expireDeletedFolders: () =>
+      expireDeletedFolders: () => {
+        const uid = useAuthStore.getState().user?.uid;
+        const expired = get().deletedFolders.filter(
+          (f) => f._deletedAt && Date.now() - new Date(f._deletedAt).getTime() >= TRASH_EXPIRY_MS
+        );
+
         set((state) => ({
           deletedFolders: state.deletedFolders.filter(
             (f) => !f._deletedAt || Date.now() - new Date(f._deletedAt).getTime() < TRASH_EXPIRY_MS
           ),
-        })),
+        }));
+
+        if (uid && !_disableFirestoreSyncForTesting) {
+          expired.forEach((f) => deletedFoldersService.delete(uid, f.id).catch(console.error));
+        }
+      },
     }),
     {
       name: buildStorageKey('folders'),

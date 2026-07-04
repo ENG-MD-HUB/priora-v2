@@ -5,18 +5,28 @@
 // ملاحظة سلوكية مهمة محفوظة من الأصل: onUnread و onAll يستثنيان دائماً الإشعارات
 // اللي كاتبها هو نفس المستخدم الحالي (authorId !== uid) — يعني لا تصلك إشعارات
 // عن تحديثاتك الخاصة. onUnread أيضاً يستثني أي إشعار already موجود بقائمة readBy.
+//
+// ⚠️ إضافة جديدة بطلب صريح: دعم "id" ثابت اختياري بـ add() — لإشعارات دورية
+// (زي "فولو أب مستحق اليوم") ممكن أكثر من جهاز/عضو يكتشفها بنفس اللحظة تقريباً.
+// بدل addDoc (id عشوائي، يعني تكرار محتمل)، نستخدم setDoc بـid ثابت محسوب من
+// (taskId + التاريخ) — فحتى لو كتب أكثر من عضو بنفس اللحظة، الكل يكتب لنفس
+// المستند، ولا يصير تكرار إطلاقاً بغض النظر عن الترتيب أو التوقيت.
 
-import { collection, addDoc, onSnapshot, query, limit, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, query, limit, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getNotificationsDb } from './firebaseNotificationsClient';
 
 export const notificationService = {
-  async add(wsId, notification) {
+  async add(wsId, notification, id = null) {
     const db = await getNotificationsDb();
-    await addDoc(collection(db, 'workspaces', wsId, 'notifications'), {
-      ...notification,
-      readBy: [],
-      createdAt: new Date().toISOString(),
-    });
+    if (id) {
+      // merge:true + بدون readBy بالـ payload = أول كتابة تنشئ المستند بدون readBy
+      // (يُقرأ كـ[] افتراضياً بكل أماكن الاستخدام)، وأي كتابة لاحقة لنفس الـid
+      // (من جهاز/عضو آخر اكتشف نفس الحدث) لا تلمس readBy الموجود فعلاً — فما ينمسح
+      // "مقروء" أي عضو سبق وقرأه.
+      await setDoc(doc(db, 'workspaces', wsId, 'notifications', id), { ...notification, createdAt: new Date().toISOString() }, { merge: true });
+    } else {
+      await addDoc(collection(db, 'workspaces', wsId, 'notifications'), { ...notification, readBy: [], createdAt: new Date().toISOString() });
+    }
   },
 
   /**
