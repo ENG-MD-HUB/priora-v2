@@ -47,18 +47,22 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
       authorAvatar: user.photoURL ?? null,
     };
 
-    const updatedTask = {
-      ...task,
+    const changedFields = {
       timeline: [entry, ...task.timeline],
       lastUpdate: noteDate,
-      status: newStatus || task.status,
-      nextFollowup: showFollowup && followupDate ? followupDate : task.nextFollowup,
+      ...(newStatus ? { status: newStatus } : {}),
+      ...(showFollowup && followupDate ? { nextFollowup: followupDate } : {}),
     };
+    const updatedTask = { ...task, ...changedFields };
 
     // Optimistic: التنبيه والإغلاق يحصلون فوراً، قبل تأكيد الحفظ بـ Firestore.
     showToast('Update added');
     onClose();
-    wsTaskService.save(wsId, updatedTask).catch((err) => console.warn('ws save:', err));
+    // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كان الحفظ هنا
+    // wsTaskService.save (استبدال كامل لنسخة الورك سبيس) — لو عضو ثاني بنفس
+    // اللحظة تقريباً غيّر حقل مختلف (مثلاً الأولوية)، الكتابة الكاملة هنا كانت
+    // ممكن تمسح تغييره. الآن تحديث جزئي فقط للحقول اللي فعلاً تغيّرت بهذا النموذج.
+    wsTaskService.update(wsId, task.id, changedFields).catch((err) => console.warn('ws update:', err));
 
     // ⚠️ تصحيح خلل حقيقي: الكود السابق كان يعتمد على وجود هذا التاسك أصلاً
     // بالكاش المحلي (useTasksStore) لحظة الكتابة (عن طريق addTimelineEntry/
@@ -67,17 +71,24 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
     // الشخصي تُلغى بصمت تام، بدون أي خطأ ظاهر. هذا بالضبط سبب "التحديث ما انعكس
     // بالمصدر" رغم إن صاحب التاسك نفسه هو اللي أضافه.
     //
-    // الحل: نكتب مباشرة لمستند Firestore الشخصي من بيانات updatedTask نفسها
+    // الحل: نكتب مباشرة لمستند Firestore الشخصي من بيانات changedFields نفسها
     // (متوفرة بالكامل هنا أصلاً، بغض النظر عن حالة الكاش المحلي) — بشرط إن
-        // المستخدم الحالي هو فعلاً مالك التاسك (task.ownerId === user.uid)، حماية
+    // المستخدم الحالي هو فعلاً مالك التاسك (task.ownerId === user.uid)، حماية
     // تمنع أي محاولة كتابة بمكان مستخدم ثاني.
+    //
+    // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة هنا
+    // tasksService.save(updatedTask) — استبدال كامل لمستند التاسك الشخصي بنسخة
+    // task المُمرَّرة لهذا المودال (من الورك سبيس)، اللي ممكن تكون ناقصة/قديمة
+    // بحقول ثانية غير متعلقة بهذا التحديث (folderId، involvedIds، إلخ لو تغيّروا
+    // بمكان ثاني بنفس اللحظة تقريباً). الآن تحديث جزئي فقط للحقول اللي فعلاً
+    // تغيّرت (changedFields)، فبقية حقول التاسك الشخصي ما تُلمَس إطلاقاً.
     if (updatedTask.workspaceId === null && task.ownerId === user.uid) {
       useTasksStore.setState((state) => ({
         tasks: state.tasks.some((t) => t.id === task.id)
-          ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+          ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields } : t))
           : state.tasks,
       }));
-      tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
+      tasksService.update(user.uid, task.id, changedFields).catch((err) => console.warn('personal sync:', err));
     }
 
     notificationService

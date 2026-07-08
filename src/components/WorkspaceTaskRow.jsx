@@ -31,11 +31,13 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
   // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow). النقر يُغلق
   // التاسك بنسخة الورك سبيس دائماً، وبالإضافة — لو هذا تاسك شخصي مُشارَك
   // (workspaceId === null) والمستخدم الحالي هو مالكه — يُحدَّث المصدر الشخصي
-  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal (كتابة مباشرة من
-  // بيانات التاسك نفسها، بدون اعتماد على وجوده بالكاش المحلي أولاً).
+  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal.
+  //
+  // ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة (بالنسختين)
+  // save كامل للتاسك — الآن تحديث جزئي لحقل status بس، فما يقدر يمسح أي حقل ثاني
+  // (زي timeline) تغيّر بمكان آخر بنفس اللحظة تقريباً.
   function handleComplete() {
-    const closedTask = { ...task, status: 'closed' };
-    wsTaskService.save(wsId, closedTask).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
+    wsTaskService.update(wsId, task.id, { status: 'closed' }).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
 
     if (task.workspaceId === null && task.ownerId === user?.uid) {
       useTasksStore.setState((state) => ({
@@ -43,7 +45,7 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
           ? state.tasks.map((t) => (t.id === task.id ? { ...t, status: 'closed' } : t))
           : state.tasks,
       }));
-      tasksService.save(user.uid, closedTask).catch((err) => console.warn('personal sync:', err));
+      tasksService.update(user.uid, task.id, { status: 'closed' }).catch((err) => console.warn('personal sync:', err));
     }
   }
 

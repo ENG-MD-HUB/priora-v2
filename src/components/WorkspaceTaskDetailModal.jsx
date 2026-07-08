@@ -32,34 +32,40 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
   // ⚠️ تصحيح خلل حقيقي (نفس فئة خلل WorkspaceTaskUpdateModal بالضبط، بس هنا):
   // تعديل ملاحظة موجودة فعلاً (تصحيح تاريخ/نص) كان يحفظ نسخة الورك سبيس فقط —
   // صفر مزامنة للمصدر الشخصي حتى لو كان المستخدم الحالي هو مالك التاسك نفسه.
-  // نفس الحل: كتابة مباشرة لـFirestore الشخصي من بيانات updatedTask نفسها،
-  // بشرط الملكية، بدون اعتماد على الكاش المحلي.
+  // نفس الحل: كتابة مباشرة لـFirestore الشخصي، بشرط الملكية، بدون اعتماد على
+  // الكاش المحلي.
+  //
+  // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كل الكتابات هنا
+  // (نسخة الورك سبيس والمصدر الشخصي معاً) كانت setDoc/save كامل — استبدال
+  // المستند بالكامل بدل تحديث الحقول المتغيّرة فقط. الآن تحديث جزئي (timeline
+  // + lastUpdate بس) بكل مكان، فأي حقل ثاني تغيّر بمكان مختلف بنفس اللحظة
+  // تقريباً (بجهاز/جلسة أخرى) ما يُمسَح.
   async function saveEditedEntry(entryId) {
     if (!editText.trim()) return;
-    const updatedTask = {
-      ...task,
-      timeline: task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e)),
+    const newTimeline = task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e));
+    const changedFields = {
+      timeline: newTimeline,
+      lastUpdate: newTimeline.reduce((max, e) => (e.date > max ? e.date : max), '') || task.lastUpdate,
     };
-    updatedTask.lastUpdate = updatedTask.timeline.reduce((max, e) => (e.date > max ? e.date : max), '') || updatedTask.lastUpdate;
-    await wsTaskService.save(wsId, updatedTask);
-    syncToPersonalSourceIfOwned(updatedTask);
+    await wsTaskService.update(wsId, task.id, changedFields);
+    syncToPersonalSourceIfOwned(changedFields);
     setEditingEntryId(null);
   }
 
   async function deleteEntry(entryId) {
-    const updatedTask = { ...task, timeline: task.timeline.filter((e) => e.id !== entryId) };
-    await wsTaskService.save(wsId, updatedTask);
-    syncToPersonalSourceIfOwned(updatedTask);
+    const changedFields = { timeline: task.timeline.filter((e) => e.id !== entryId) };
+    await wsTaskService.update(wsId, task.id, changedFields);
+    syncToPersonalSourceIfOwned(changedFields);
   }
 
-  function syncToPersonalSourceIfOwned(updatedTask) {
-    if (updatedTask.workspaceId !== null || updatedTask.ownerId !== user?.uid) return;
+  function syncToPersonalSourceIfOwned(changedFields) {
+    if (task.workspaceId !== null || task.ownerId !== user?.uid) return;
     useTasksStore.setState((state) => ({
-      tasks: state.tasks.some((t) => t.id === updatedTask.id)
-        ? state.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
+      tasks: state.tasks.some((t) => t.id === task.id)
+        ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields } : t))
         : state.tasks,
     }));
-    tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
+    tasksService.update(user.uid, task.id, changedFields).catch((err) => console.warn('personal sync:', err));
   }
 
   return (

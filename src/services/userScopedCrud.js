@@ -10,11 +10,29 @@ import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firesto
 import { getUserScopedDb } from './firebaseClient';
 
 /**
- * يحفظ مستند واحد تحت users/{uid}/{collectionName}/{docId}
+ * يحفظ مستند واحد تحت users/{uid}/{collectionName}/{docId} — استبدال كامل (setDoc).
  */
 export async function saveUserDoc(uid, collectionName, docId, data) {
   const db = await getUserScopedDb();
   await setDoc(doc(db, 'users', uid, collectionName, docId), data);
+}
+
+/**
+ * ⚠️ إضافة بطلب صريح (بعد حادثة فقدان بيانات حقيقية): تحديث جزئي (الحقول المُمرَّرة
+ * فقط) بدل استبدال كامل. يستخدم setDoc مع { merge: true } — أي حقل مو موجود
+ * بـpartialData يبقى كما هو بـFirestore، ما يُلمَس إطلاقاً. هذا يمنع فئة كاملة من
+ * فقدان البيانات: لو جهاز/جلسة عندها نسخة قديمة من التاسك وسوت تحديث جزئي (حتى لو
+ * على حقل تاني)، التحديثات الحديثة بحقول ثانية (زي timeline) ما تُمسح، لأنها أصلاً
+ * مو جزء من الكتابة.
+ *
+ * اخترنا setDoc+merge بدل updateDoc تحديداً: updateDoc يفشل لو المستند مو موجود
+ * أصلاً بـFirestore بعد (مثلاً سباق نادر: تعديل فوري جداً بعد إنشاء تاسك جديد،
+ * قبل ما تكتمل كتابة setDoc الأولى) — setDoc+merge يتعامل مع الحالتين (موجود/غير
+ * موجود) بأمان، بنفس سلوك الدمج الجزئي بالضبط.
+ */
+export async function updateUserDoc(uid, collectionName, docId, partialData) {
+  const db = await getUserScopedDb();
+  await setDoc(doc(db, 'users', uid, collectionName, docId), partialData, { merge: true });
 }
 
 /**

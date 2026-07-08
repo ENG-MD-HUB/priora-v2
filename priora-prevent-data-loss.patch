@@ -1,0 +1,336 @@
+diff --git a/src/components/WorkspaceTaskDetailModal.jsx b/src/components/WorkspaceTaskDetailModal.jsx
+index 0ae8a56..3487896 100644
+--- a/src/components/WorkspaceTaskDetailModal.jsx
++++ b/src/components/WorkspaceTaskDetailModal.jsx
+@@ -32,34 +32,40 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
+   // ⚠️ تصحيح خلل حقيقي (نفس فئة خلل WorkspaceTaskUpdateModal بالضبط، بس هنا):
+   // تعديل ملاحظة موجودة فعلاً (تصحيح تاريخ/نص) كان يحفظ نسخة الورك سبيس فقط —
+   // صفر مزامنة للمصدر الشخصي حتى لو كان المستخدم الحالي هو مالك التاسك نفسه.
+-  // نفس الحل: كتابة مباشرة لـFirestore الشخصي من بيانات updatedTask نفسها،
+-  // بشرط الملكية، بدون اعتماد على الكاش المحلي.
++  // نفس الحل: كتابة مباشرة لـFirestore الشخصي، بشرط الملكية، بدون اعتماد على
++  // الكاش المحلي.
++  //
++  // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كل الكتابات هنا
++  // (نسخة الورك سبيس والمصدر الشخصي معاً) كانت setDoc/save كامل — استبدال
++  // المستند بالكامل بدل تحديث الحقول المتغيّرة فقط. الآن تحديث جزئي (timeline
++  // + lastUpdate بس) بكل مكان، فأي حقل ثاني تغيّر بمكان مختلف بنفس اللحظة
++  // تقريباً (بجهاز/جلسة أخرى) ما يُمسَح.
+   async function saveEditedEntry(entryId) {
+     if (!editText.trim()) return;
+-    const updatedTask = {
+-      ...task,
+-      timeline: task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e)),
++    const newTimeline = task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e));
++    const changedFields = {
++      timeline: newTimeline,
++      lastUpdate: newTimeline.reduce((max, e) => (e.date > max ? e.date : max), '') || task.lastUpdate,
+     };
+-    updatedTask.lastUpdate = updatedTask.timeline.reduce((max, e) => (e.date > max ? e.date : max), '') || updatedTask.lastUpdate;
+-    await wsTaskService.save(wsId, updatedTask);
+-    syncToPersonalSourceIfOwned(updatedTask);
++    await wsTaskService.update(wsId, task.id, changedFields);
++    syncToPersonalSourceIfOwned(changedFields);
+     setEditingEntryId(null);
+   }
+ 
+   async function deleteEntry(entryId) {
+-    const updatedTask = { ...task, timeline: task.timeline.filter((e) => e.id !== entryId) };
+-    await wsTaskService.save(wsId, updatedTask);
+-    syncToPersonalSourceIfOwned(updatedTask);
++    const changedFields = { timeline: task.timeline.filter((e) => e.id !== entryId) };
++    await wsTaskService.update(wsId, task.id, changedFields);
++    syncToPersonalSourceIfOwned(changedFields);
+   }
+ 
+-  function syncToPersonalSourceIfOwned(updatedTask) {
+-    if (updatedTask.workspaceId !== null || updatedTask.ownerId !== user?.uid) return;
++  function syncToPersonalSourceIfOwned(changedFields) {
++    if (task.workspaceId !== null || task.ownerId !== user?.uid) return;
+     useTasksStore.setState((state) => ({
+-      tasks: state.tasks.some((t) => t.id === updatedTask.id)
+-        ? state.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
++      tasks: state.tasks.some((t) => t.id === task.id)
++        ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields } : t))
+         : state.tasks,
+     }));
+-    tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
++    tasksService.update(user.uid, task.id, changedFields).catch((err) => console.warn('personal sync:', err));
+   }
+ 
+   return (
+diff --git a/src/components/WorkspaceTaskRow.jsx b/src/components/WorkspaceTaskRow.jsx
+index e89f8bf..e09e669 100644
+--- a/src/components/WorkspaceTaskRow.jsx
++++ b/src/components/WorkspaceTaskRow.jsx
+@@ -31,11 +31,13 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+   // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow). النقر يُغلق
+   // التاسك بنسخة الورك سبيس دائماً، وبالإضافة — لو هذا تاسك شخصي مُشارَك
+   // (workspaceId === null) والمستخدم الحالي هو مالكه — يُحدَّث المصدر الشخصي
+-  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal (كتابة مباشرة من
+-  // بيانات التاسك نفسها، بدون اعتماد على وجوده بالكاش المحلي أولاً).
++  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal.
++  //
++  // ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة (بالنسختين)
++  // save كامل للتاسك — الآن تحديث جزئي لحقل status بس، فما يقدر يمسح أي حقل ثاني
++  // (زي timeline) تغيّر بمكان آخر بنفس اللحظة تقريباً.
+   function handleComplete() {
+-    const closedTask = { ...task, status: 'closed' };
+-    wsTaskService.save(wsId, closedTask).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
++    wsTaskService.update(wsId, task.id, { status: 'closed' }).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
+ 
+     if (task.workspaceId === null && task.ownerId === user?.uid) {
+       useTasksStore.setState((state) => ({
+@@ -43,7 +45,7 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+           ? state.tasks.map((t) => (t.id === task.id ? { ...t, status: 'closed' } : t))
+           : state.tasks,
+       }));
+-      tasksService.save(user.uid, closedTask).catch((err) => console.warn('personal sync:', err));
++      tasksService.update(user.uid, task.id, { status: 'closed' }).catch((err) => console.warn('personal sync:', err));
+     }
+   }
+ 
+diff --git a/src/components/WorkspaceTaskUpdateModal.jsx b/src/components/WorkspaceTaskUpdateModal.jsx
+index 5c71b2e..9aeb26b 100644
+--- a/src/components/WorkspaceTaskUpdateModal.jsx
++++ b/src/components/WorkspaceTaskUpdateModal.jsx
+@@ -47,18 +47,22 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
+       authorAvatar: user.photoURL ?? null,
+     };
+ 
+-    const updatedTask = {
+-      ...task,
++    const changedFields = {
+       timeline: [entry, ...task.timeline],
+       lastUpdate: noteDate,
+-      status: newStatus || task.status,
+-      nextFollowup: showFollowup && followupDate ? followupDate : task.nextFollowup,
++      ...(newStatus ? { status: newStatus } : {}),
++      ...(showFollowup && followupDate ? { nextFollowup: followupDate } : {}),
+     };
++    const updatedTask = { ...task, ...changedFields };
+ 
+     // Optimistic: التنبيه والإغلاق يحصلون فوراً، قبل تأكيد الحفظ بـ Firestore.
+     showToast('Update added');
+     onClose();
+-    wsTaskService.save(wsId, updatedTask).catch((err) => console.warn('ws save:', err));
++    // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كان الحفظ هنا
++    // wsTaskService.save (استبدال كامل لنسخة الورك سبيس) — لو عضو ثاني بنفس
++    // اللحظة تقريباً غيّر حقل مختلف (مثلاً الأولوية)، الكتابة الكاملة هنا كانت
++    // ممكن تمسح تغييره. الآن تحديث جزئي فقط للحقول اللي فعلاً تغيّرت بهذا النموذج.
++    wsTaskService.update(wsId, task.id, changedFields).catch((err) => console.warn('ws update:', err));
+ 
+     // ⚠️ تصحيح خلل حقيقي: الكود السابق كان يعتمد على وجود هذا التاسك أصلاً
+     // بالكاش المحلي (useTasksStore) لحظة الكتابة (عن طريق addTimelineEntry/
+@@ -67,17 +71,24 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
+     // الشخصي تُلغى بصمت تام، بدون أي خطأ ظاهر. هذا بالضبط سبب "التحديث ما انعكس
+     // بالمصدر" رغم إن صاحب التاسك نفسه هو اللي أضافه.
+     //
+-    // الحل: نكتب مباشرة لمستند Firestore الشخصي من بيانات updatedTask نفسها
++    // الحل: نكتب مباشرة لمستند Firestore الشخصي من بيانات changedFields نفسها
+     // (متوفرة بالكامل هنا أصلاً، بغض النظر عن حالة الكاش المحلي) — بشرط إن
+-        // المستخدم الحالي هو فعلاً مالك التاسك (task.ownerId === user.uid)، حماية
++    // المستخدم الحالي هو فعلاً مالك التاسك (task.ownerId === user.uid)، حماية
+     // تمنع أي محاولة كتابة بمكان مستخدم ثاني.
++    //
++    // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة هنا
++    // tasksService.save(updatedTask) — استبدال كامل لمستند التاسك الشخصي بنسخة
++    // task المُمرَّرة لهذا المودال (من الورك سبيس)، اللي ممكن تكون ناقصة/قديمة
++    // بحقول ثانية غير متعلقة بهذا التحديث (folderId، involvedIds، إلخ لو تغيّروا
++    // بمكان ثاني بنفس اللحظة تقريباً). الآن تحديث جزئي فقط للحقول اللي فعلاً
++    // تغيّرت (changedFields)، فبقية حقول التاسك الشخصي ما تُلمَس إطلاقاً.
+     if (updatedTask.workspaceId === null && task.ownerId === user.uid) {
+       useTasksStore.setState((state) => ({
+         tasks: state.tasks.some((t) => t.id === task.id)
+-          ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
++          ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields } : t))
+           : state.tasks,
+       }));
+-      tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
++      tasksService.update(user.uid, task.id, changedFields).catch((err) => console.warn('personal sync:', err));
+     }
+ 
+     notificationService
+diff --git a/src/services/tasksService.js b/src/services/tasksService.js
+index 96addc8..99d6241 100644
+--- a/src/services/tasksService.js
++++ b/src/services/tasksService.js
+@@ -2,11 +2,14 @@
+ // خدمة التاسكات الشخصية — مسار التخزين: users/{uid}/tasks/{taskId}
+ // نسخة مُعاد كتابتها بوضوح من المتغير `he` بالكود الأصلي المضغوط.
+ 
+-import { saveUserDoc, deleteUserDoc, onUserCollection } from './userScopedCrud';
++import { saveUserDoc, updateUserDoc, deleteUserDoc, onUserCollection } from './userScopedCrud';
+ 
+ export const tasksService = {
+   save: (uid, task) => saveUserDoc(uid, 'tasks', task.id, task),
+ 
++  // ⚠️ إضافة بطلب صريح — راجع الشرح المفصّل بـuserScopedCrud.js (updateUserDoc).
++  update: (uid, taskId, partialData) => updateUserDoc(uid, 'tasks', taskId, partialData),
++
+   delete: (uid, taskId) => deleteUserDoc(uid, 'tasks', taskId),
+ 
+   /**
+diff --git a/src/services/userScopedCrud.js b/src/services/userScopedCrud.js
+index 16c76ad..6023d9d 100644
+--- a/src/services/userScopedCrud.js
++++ b/src/services/userScopedCrud.js
+@@ -10,13 +10,31 @@ import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firesto
+ import { getUserScopedDb } from './firebaseClient';
+ 
+ /**
+- * يحفظ مستند واحد تحت users/{uid}/{collectionName}/{docId}
++ * يحفظ مستند واحد تحت users/{uid}/{collectionName}/{docId} — استبدال كامل (setDoc).
+  */
+ export async function saveUserDoc(uid, collectionName, docId, data) {
+   const db = await getUserScopedDb();
+   await setDoc(doc(db, 'users', uid, collectionName, docId), data);
+ }
+ 
++/**
++ * ⚠️ إضافة بطلب صريح (بعد حادثة فقدان بيانات حقيقية): تحديث جزئي (الحقول المُمرَّرة
++ * فقط) بدل استبدال كامل. يستخدم setDoc مع { merge: true } — أي حقل مو موجود
++ * بـpartialData يبقى كما هو بـFirestore، ما يُلمَس إطلاقاً. هذا يمنع فئة كاملة من
++ * فقدان البيانات: لو جهاز/جلسة عندها نسخة قديمة من التاسك وسوت تحديث جزئي (حتى لو
++ * على حقل تاني)، التحديثات الحديثة بحقول ثانية (زي timeline) ما تُمسح، لأنها أصلاً
++ * مو جزء من الكتابة.
++ *
++ * اخترنا setDoc+merge بدل updateDoc تحديداً: updateDoc يفشل لو المستند مو موجود
++ * أصلاً بـFirestore بعد (مثلاً سباق نادر: تعديل فوري جداً بعد إنشاء تاسك جديد،
++ * قبل ما تكتمل كتابة setDoc الأولى) — setDoc+merge يتعامل مع الحالتين (موجود/غير
++ * موجود) بأمان، بنفس سلوك الدمج الجزئي بالضبط.
++ */
++export async function updateUserDoc(uid, collectionName, docId, partialData) {
++  const db = await getUserScopedDb();
++  await setDoc(doc(db, 'users', uid, collectionName, docId), partialData, { merge: true });
++}
++
+ /**
+  * يحذف مستند واحد من users/{uid}/{collectionName}/{docId}
+  */
+diff --git a/src/services/wsTaskService.js b/src/services/wsTaskService.js
+index 2b82ddc..b4e6bea 100644
+--- a/src/services/wsTaskService.js
++++ b/src/services/wsTaskService.js
+@@ -13,9 +13,11 @@ export const wsTaskService = {
+     await setDoc(doc(db, 'workspaces', wsId, 'tasks', task.id), taskToFirestoreShape(task));
+   },
+ 
++  // ⚠️ setDoc+merge بدل updateDoc (نفس سبب userScopedCrud.js بالضبط) — يتعامل
++  // بأمان حتى لو المستند مو موجود بعد بسباق نادر، بنفس سلوك الدمج الجزئي.
+   async update(wsId, taskId, partialData) {
+     const db = await getWorkspaceScopedDb();
+-    await updateDoc(doc(db, 'workspaces', wsId, 'tasks', taskId), partialData);
++    await setDoc(doc(db, 'workspaces', wsId, 'tasks', taskId), partialData, { merge: true });
+   },
+ 
+   async delete(wsId, taskId) {
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index 321ad7e..46d26f3 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -67,9 +67,18 @@ export const useTasksStore = create(
+       },
+ 
+       /**
+-       * تعديل تاسك. لو التاسك شخصي (workspaceId === null)، يُحفظ كامل بالخدمة الشخصية.
+-       * بالتوازي، لو التاسك مشترك مع ورك سبيس واحد أو أكثر، فقط الحقول الموجودة فعلياً
+-       * بـ partialData (من SHARED_UPDATE_FIELDS) تُنشر لكل ورك سبيس مشترك معه.
++       * تعديل تاسك. لو التاسك شخصي (workspaceId === null)، الحقول المتغيّرة فقط
++       * (partialData) تُحدَّث بـFirestore — مو المستند كامل. بالتوازي، لو التاسك
++       * مشترك مع ورك سبيس واحد أو أكثر، فقط الحقول الموجودة فعلياً بـpartialData
++       * (من SHARED_UPDATE_FIELDS) تُنشر لكل ورك سبيس مشترك معه.
++       *
++       * ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت تحفظ المستند
++       * الشخصي كامل (tasksService.save) — لو جهاز/جلسة عندها نسخة محلية قديمة
++       * من هذا التاسك (حتى قبل مدة، من كاش متصفح لم يتزامن)، وسوت أي تعديل بسيط
++       * (حالة، تاريخ)، كانت الكتابة الكاملة تمسح أي حقل تغيّر بمكان ثاني بينهما
++       * (زي تحديثات timeline أُضيفت من جهاز آخر) — بصمت تام، بدون أي خطأ. الحل:
++       * تحديث جزئي فقط (tasksService.update) — نفس المبدأ المطبَّق أصلاً بالورك
++       * سبيس (wsTaskService.update)، الآن للتاسكات الشخصية أيضاً.
+        */
+       updateTask: (id, partialData) => {
+         set((state) => ({
+@@ -81,10 +90,9 @@ export const useTasksStore = create(
+ 
+         const original = get().tasks.find((t) => t.id === id);
+         if (!original) return;
+-        const merged = { ...original, ...partialData };
+ 
+         if (original.workspaceId === null && !_disableFirestoreSyncForTesting) {
+-          tasksService.save(uid, merged).catch(console.error);
++          tasksService.update(uid, id, partialData).catch(console.error);
+         }
+ 
+         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
+@@ -230,8 +238,10 @@ export const useTasksStore = create(
+        * يضيف ملاحظة (timeline entry) لتاسك. lastUpdate يُعاد حسابه دائماً كأقصى تاريخ
+        * بين كل عناصر التايملاين (بما فيها العنصر الجديد) والتاريخ المُمرَّر مباشرة.
+        *
+-       * فرق مهم عن updateTask: المزامنة مع الورك سبيس هنا تحفظ التاسك كامل
+-       * (wsTaskService.save) لا تنشر حقول جزئية فقط (wsTaskService.update).
++       * ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت المزامنة (شخصي
++       * وورك سبيس معاً) تحفظ التاسك كامل — نفس فئة الخلل الموضحة أعلى updateTask
++       * بالضبط. الآن تحديث جزئي فقط لحقلي timeline وlastUpdate، بغض النظر شخصي
++       * أو مشترك، فما يقدر يمسح أي حقل ثاني تغيّر بمكان آخر بينهما.
+        */
+       addTimelineEntry: (taskId, text, date, authorId, authorName, authorAvatar) => {
+         const entry = {
+@@ -262,13 +272,15 @@ export const useTasksStore = create(
+         const updated = get().tasks.find((t) => t.id === taskId);
+         if (!updated || updated.workspaceId !== null) return;
+ 
+-        tasksService.save(uid, updated).catch(console.error);
+-        (updated.sharedToWsIds ?? []).forEach((wsId) => {
+-          const latest = get().tasks.find((t) => t.id === taskId);
+-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
+-        });
++        const partialUpdate = { timeline: updated.timeline, lastUpdate: updated.lastUpdate };
++        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
++        (updated.sharedToWsIds ?? []).forEach((wsId) =>
++          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
++        );
+       },
+ 
++      // ⚠️ نفس تصحيح addTimelineEntry بالضبط — تحديث جزئي (timeline + lastUpdate)
++      // بدل حفظ كامل، للسبب نفسه.
+       updateTimelineEntry: (taskId, entryId, newText, newDate) => {
+         set((state) => ({
+           tasks: state.tasks.map((t) => {
+@@ -285,13 +297,14 @@ export const useTasksStore = create(
+         const task = get().tasks.find((t) => t.id === taskId);
+         if (!task || task.workspaceId !== null) return;
+ 
+-        tasksService.save(uid, task).catch(console.error);
+-        (task.sharedToWsIds ?? []).forEach((wsId) => {
+-          const latest = get().tasks.find((t) => t.id === taskId);
+-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
+-        });
++        const partialUpdate = { timeline: task.timeline, lastUpdate: task.lastUpdate };
++        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
++        (task.sharedToWsIds ?? []).forEach((wsId) =>
++          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
++        );
+       },
+ 
++      // ⚠️ نفس تصحيح addTimelineEntry بالضبط — تحديث جزئي (timeline فقط) بدل حفظ كامل.
+       deleteTimelineEntry: (taskId, entryId) => {
+         set((state) => ({
+           tasks: state.tasks.map((t) =>
+@@ -305,11 +318,11 @@ export const useTasksStore = create(
+         const task = get().tasks.find((t) => t.id === taskId);
+         if (!task || task.workspaceId !== null) return;
+ 
+-        tasksService.save(uid, task).catch(console.error);
+-        (task.sharedToWsIds ?? []).forEach((wsId) => {
+-          const latest = get().tasks.find((t) => t.id === taskId);
+-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
+-        });
++        const partialUpdate = { timeline: task.timeline };
++        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
++        (task.sharedToWsIds ?? []).forEach((wsId) =>
++          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
++        );
+       },
+     }),
+     {

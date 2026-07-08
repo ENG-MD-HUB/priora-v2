@@ -67,9 +67,18 @@ export const useTasksStore = create(
       },
 
       /**
-       * تعديل تاسك. لو التاسك شخصي (workspaceId === null)، يُحفظ كامل بالخدمة الشخصية.
-       * بالتوازي، لو التاسك مشترك مع ورك سبيس واحد أو أكثر، فقط الحقول الموجودة فعلياً
-       * بـ partialData (من SHARED_UPDATE_FIELDS) تُنشر لكل ورك سبيس مشترك معه.
+       * تعديل تاسك. لو التاسك شخصي (workspaceId === null)، الحقول المتغيّرة فقط
+       * (partialData) تُحدَّث بـFirestore — مو المستند كامل. بالتوازي، لو التاسك
+       * مشترك مع ورك سبيس واحد أو أكثر، فقط الحقول الموجودة فعلياً بـpartialData
+       * (من SHARED_UPDATE_FIELDS) تُنشر لكل ورك سبيس مشترك معه.
+       *
+       * ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت تحفظ المستند
+       * الشخصي كامل (tasksService.save) — لو جهاز/جلسة عندها نسخة محلية قديمة
+       * من هذا التاسك (حتى قبل مدة، من كاش متصفح لم يتزامن)، وسوت أي تعديل بسيط
+       * (حالة، تاريخ)، كانت الكتابة الكاملة تمسح أي حقل تغيّر بمكان ثاني بينهما
+       * (زي تحديثات timeline أُضيفت من جهاز آخر) — بصمت تام، بدون أي خطأ. الحل:
+       * تحديث جزئي فقط (tasksService.update) — نفس المبدأ المطبَّق أصلاً بالورك
+       * سبيس (wsTaskService.update)، الآن للتاسكات الشخصية أيضاً.
        */
       updateTask: (id, partialData) => {
         set((state) => ({
@@ -81,10 +90,9 @@ export const useTasksStore = create(
 
         const original = get().tasks.find((t) => t.id === id);
         if (!original) return;
-        const merged = { ...original, ...partialData };
 
         if (original.workspaceId === null && !_disableFirestoreSyncForTesting) {
-          tasksService.save(uid, merged).catch(console.error);
+          tasksService.update(uid, id, partialData).catch(console.error);
         }
 
         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
@@ -230,8 +238,10 @@ export const useTasksStore = create(
        * يضيف ملاحظة (timeline entry) لتاسك. lastUpdate يُعاد حسابه دائماً كأقصى تاريخ
        * بين كل عناصر التايملاين (بما فيها العنصر الجديد) والتاريخ المُمرَّر مباشرة.
        *
-       * فرق مهم عن updateTask: المزامنة مع الورك سبيس هنا تحفظ التاسك كامل
-       * (wsTaskService.save) لا تنشر حقول جزئية فقط (wsTaskService.update).
+       * ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت المزامنة (شخصي
+       * وورك سبيس معاً) تحفظ التاسك كامل — نفس فئة الخلل الموضحة أعلى updateTask
+       * بالضبط. الآن تحديث جزئي فقط لحقلي timeline وlastUpdate، بغض النظر شخصي
+       * أو مشترك، فما يقدر يمسح أي حقل ثاني تغيّر بمكان آخر بينهما.
        */
       addTimelineEntry: (taskId, text, date, authorId, authorName, authorAvatar) => {
         const entry = {
@@ -262,13 +272,15 @@ export const useTasksStore = create(
         const updated = get().tasks.find((t) => t.id === taskId);
         if (!updated || updated.workspaceId !== null) return;
 
-        tasksService.save(uid, updated).catch(console.error);
-        (updated.sharedToWsIds ?? []).forEach((wsId) => {
-          const latest = get().tasks.find((t) => t.id === taskId);
-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
-        });
+        const partialUpdate = { timeline: updated.timeline, lastUpdate: updated.lastUpdate };
+        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        (updated.sharedToWsIds ?? []).forEach((wsId) =>
+          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
+        );
       },
 
+      // ⚠️ نفس تصحيح addTimelineEntry بالضبط — تحديث جزئي (timeline + lastUpdate)
+      // بدل حفظ كامل، للسبب نفسه.
       updateTimelineEntry: (taskId, entryId, newText, newDate) => {
         set((state) => ({
           tasks: state.tasks.map((t) => {
@@ -285,13 +297,14 @@ export const useTasksStore = create(
         const task = get().tasks.find((t) => t.id === taskId);
         if (!task || task.workspaceId !== null) return;
 
-        tasksService.save(uid, task).catch(console.error);
-        (task.sharedToWsIds ?? []).forEach((wsId) => {
-          const latest = get().tasks.find((t) => t.id === taskId);
-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
-        });
+        const partialUpdate = { timeline: task.timeline, lastUpdate: task.lastUpdate };
+        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        (task.sharedToWsIds ?? []).forEach((wsId) =>
+          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
+        );
       },
 
+      // ⚠️ نفس تصحيح addTimelineEntry بالضبط — تحديث جزئي (timeline فقط) بدل حفظ كامل.
       deleteTimelineEntry: (taskId, entryId) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -305,11 +318,11 @@ export const useTasksStore = create(
         const task = get().tasks.find((t) => t.id === taskId);
         if (!task || task.workspaceId !== null) return;
 
-        tasksService.save(uid, task).catch(console.error);
-        (task.sharedToWsIds ?? []).forEach((wsId) => {
-          const latest = get().tasks.find((t) => t.id === taskId);
-          if (latest) wsTaskService.save(wsId, latest).catch(console.error);
-        });
+        const partialUpdate = { timeline: task.timeline };
+        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        (task.sharedToWsIds ?? []).forEach((wsId) =>
+          wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
+        );
       },
     }),
     {
