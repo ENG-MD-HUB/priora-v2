@@ -1,0 +1,66 @@
+diff --git a/src/store/foldersStore.js b/src/store/foldersStore.js
+index 2ebab0b..de251f4 100644
+--- a/src/store/foldersStore.js
++++ b/src/store/foldersStore.js
+@@ -22,6 +22,8 @@ import { deletedFoldersService } from '../services/deletedFoldersService';
+ import { generateId } from '../utils/generateId';
+ import { buildStorageKey } from '../utils/anonUserTracking';
+ import { TRASH_EXPIRY_MS } from '../utils/trashConstants';
++import { retryFirestoreWrite } from '../utils/retryFirestoreWrite';
++import { showToast } from './toastStore';
+ 
+ let _disableFirestoreSyncForTesting = false;
+ export function setDisableFirestoreSyncForTesting(value) {
+@@ -110,7 +112,13 @@ export const useFoldersStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          foldersService.delete(uid, id).catch(console.error);
++          // ⚠️ تصحيح خلل حقيقي (حادثة فولدر رجع يظهر بعد أسابيع): كانت هذي الكتابة
++          // fire-and-forget بدون أي إعادة محاولة — فشل شبكة لحظي كان يخلي الفولدر
++          // "زومبي" بـFirestore للأبد بصمت تام. الآن 3 محاولات، وتحذير واضح لو
++          // فشلت الكل، بدل فشل صامت.
++          retryFirestoreWrite(() => foldersService.delete(uid, id), {
++            onFinalFailure: () => showToast(`Couldn't fully delete "${folder.name}" — check your connection and try again`, 'error'),
++          });
+           deletedFoldersService.save(uid, deletedFolder).catch(console.error);
+         }
+       },
+diff --git a/src/utils/retryFirestoreWrite.js b/src/utils/retryFirestoreWrite.js
+new file mode 100644
+index 0000000..eec3ea3
+--- /dev/null
++++ b/src/utils/retryFirestoreWrite.js
+@@ -0,0 +1,32 @@
++// retryFirestoreWrite.js
++// ⚠️ إضافة جديدة بطلب صريح (بعد حادثة حذف فولدر فشل بصمت بـFirestore وبقي "زومبي"
++// لأسابيع قبل ما يرجع يظهر). ما موجودة بالكود الأصلي.
++//
++// المشكلة اللي تحلّها: كل كتابة/حذف بـFirestore بهذا التطبيق كانت "أرسل وانسَ"
++// (fire-and-forget) — فشل مؤقت (انقطاع إنترنت لحظي، مشكلة شبكة عابرة) يُسجَّل
++// بـconsole فقط، بدون إعادة محاولة، وبدون أي تنبيه للمستخدم. لو الفشل صار بعملية
++// حذف تحديداً، المستند يبقى "زومبي" بـFirestore للأبد (يظهر لك محذوف محلياً، لكنه
++// حقيقةً لسا موجود) — يرجع يظهر فجأة بأي مزامنة كاملة لاحقة (تسجيل دخول جديد،
++// مسح كاش، جهاز آخر).
++//
++// الحل: محاولات متكررة (3 افتراضياً) بفاصل زمني متصاعد، وإذا فشلت الكل، استدعاء
++// onFinalFailure (عادة toast تحذيري) عشان المستخدم يعرف يعيد المحاولة يدوياً،
++// بدل فشل صامت تام.
++
++export async function retryFirestoreWrite(writeFn, { attempts = 3, delayMs = 1000, onFinalFailure } = {}) {
++  let lastError;
++  for (let i = 0; i < attempts; i++) {
++    try {
++      await writeFn();
++      return true;
++    } catch (err) {
++      lastError = err;
++      if (i < attempts - 1) {
++        await new Promise((resolve) => setTimeout(resolve, delayMs * (i + 1)));
++      }
++    }
++  }
++  console.error('retryFirestoreWrite: all attempts failed', lastError);
++  onFinalFailure?.(lastError);
++  return false;
++}
