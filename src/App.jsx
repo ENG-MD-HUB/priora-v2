@@ -26,6 +26,7 @@ import { contactsService } from './services/contactsService';
 import { trashService } from './services/trashService';
 import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
 import { useWorkspaceFollowupNotifications } from './utils/useWorkspaceFollowupNotifications';
+import { repairZombieItems } from './utils/repairZombieItems';
 import { useFontScale } from './utils/useFontScale';
 import { useIdleScreensaver } from './utils/useIdleScreensaver';
 import { Screensaver } from './components/Screensaver';
@@ -76,6 +77,10 @@ function AuthenticatedApp() {
       // نُعيد فحص الانتهاء فوراً — بدل انتظار إعادة تحميل تالية لالتقاطه.
       useTasksStore.getState().expireTrash();
       useFoldersStore.getState().expireDeletedFolders();
+      // ⚠️ إضافة بطلب صريح (بعد اكتشاف تراكم فعلي لعناصر زومبي بعد تسجيل خروج/دخول):
+      // تنظيف تلقائي لأي عنصر موجود بنفس اللحظة بالمجموعة النشطة والمحذوفة معاً —
+      // راجع الشرح المفصّل بـrepairZombieItems.js.
+      repairZombieItems(user.uid);
     });
   }, [user?.uid]);
 
