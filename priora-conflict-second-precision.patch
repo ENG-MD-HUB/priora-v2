@@ -1,0 +1,124 @@
+diff --git a/src/services/tasksService.js b/src/services/tasksService.js
+index 6daf76c..6eb5fab 100644
+--- a/src/services/tasksService.js
++++ b/src/services/tasksService.js
+@@ -11,9 +11,10 @@ export const tasksService = {
+   update: (uid, taskId, partialData) => updateUserDoc(uid, 'tasks', taskId, partialData),
+ 
+   // ⚠️ إضافة جديدة بطلب صريح — نفس update لكن ترفض الكتابة لو السيرفر عنده
+-  // نسخة أحدث من اللي يعرفها العميل. راجع الشرح المفصّل بـupdateUserDocIfNotStale.
+-  updateIfNotStale: (uid, taskId, partialData, expectedLastUpdate) =>
+-    updateUserDocIfNotStale(uid, 'tasks', taskId, partialData, expectedLastUpdate),
++  // نسخة أحدث من اللي يعرفها العميل (مقارنة بدقة الثانية عبر _syncTs، مو
++  // lastUpdate اليومي). راجع الشرح المفصّل بـupdateUserDocIfNotStale.
++  updateIfNotStale: (uid, taskId, partialData, expectedSyncTs) =>
++    updateUserDocIfNotStale(uid, 'tasks', taskId, partialData, expectedSyncTs),
+ 
+   delete: (uid, taskId) => deleteUserDoc(uid, 'tasks', taskId),
+ 
+diff --git a/src/services/userScopedCrud.js b/src/services/userScopedCrud.js
+index 350a4ac..d984de3 100644
+--- a/src/services/userScopedCrud.js
++++ b/src/services/userScopedCrud.js
+@@ -39,36 +39,43 @@ export async function updateUserDoc(uid, collectionName, docId, partialData) {
+  * ⚠️ إضافة جديدة بطلب صريح: "آلية آمنة" تقارن آخر تحديث بالسيرفر قبل الكتابة —
+  * تحمي من جهاز/كود قديم (زي حادثة الجوال) يكتب فوق نسخة أحدث بدون علمه.
+  *
++ * ⚠️ تحسين دقة بطلب صريح (النسخة الأولى كانت تقارن بحقل lastUpdate — تاريخ فقط
++ * بدون وقت، YYYY-MM-DD). المشكلة: تعديلين حقيقيين متعارضين بنفس اليوم (صباحاً
++ * ومساءً مثلاً) ما كانا يُكتشفان إطلاقاً، لأن التاريخين متطابقين نصياً رغم اختلاف
++ * الوقت الفعلي بالساعات. الحل: حقل تقني منفصل _syncTs (تاريخ+وقت كامل، ISO
++ * datetime بدقة الميلي ثانية) — مخصص للمقارنة التقنية بس، لا علاقة له بـlastUpdate
++ * (اللي يبقى للعرض/منطق العمل كما هو، تاريخ فقط بقصد). كل كتابة عبر هذي الدالة
++ * تختم _syncTs تلقائياً (new Date().toISOString()) — المستدعي ما يحتاج يمرره
++ * بنفسه بالكتابة، بس يمرر آخر قيمة كان يعرفها (expectedSyncTs) للمقارنة.
++ *
+  * الفكرة: قبل أي كتابة، نقرأ المستند الحالي فعلياً من Firestore أولاً (getDoc)،
+- * ونقارن حقل lastUpdate فيه مع "آخر نسخة كان العميل يعرفها" (expectedLastUpdate —
+- * القيمة اللي كانت عند العميل قبل ما يسوي تعديله). لو السيرفر عنده تحديث أحدث
+- * من اللي كان العميل يعرفه، معناته صار تعديل بمكان/جهاز ثاني ما وصل لهذا العميل
+- * بعد — فنرفض الكتابة (بدل ما تمسحه بصمت)، ونرجّع علامة "متعارض" للمستدعي يقرر
+- * وش يسوي (عادة: تنبيه المستخدم + الاعتماد على الاستماع اللحظي يجيب النسخة
+- * الصحيحة تلقائياً بعد ثواني).
++ * ونقارن _syncTs فيه مع آخر نسخة كان العميل يعرفها (expectedSyncTs). لو السيرفر
++ * عنده _syncTs أحدث من اللي كان العميل يعرفه، معناته صار تعديل بمكان/جهاز ثاني
++ * ما وصل لهذا العميل بعد — فنرفض الكتابة (بدل ما تمسحه بصمت)، ونرجّع علامة
++ * "متعارض" للمستدعي يقرر وش يسوي.
+  *
+- * لو المستند غير موجود أصلاً، أو ما فيه lastUpdate محفوظ، أو expectedLastUpdate
+- * غير مُمرَّر (استدعاء قديم ما يدعم الفحص) — نكتب عادي بدون فحص (سلوك متوافق
+- * للخلف، ما يكسر أي كود ثاني).
++ * لو المستند غير موجود أصلاً، أو ما فيه _syncTs محفوظ (تاسك قديم من قبل هذي
++ * الميزة)، أو expectedSyncTs غير مُمرَّر — نكتب عادي بدون فحص (سلوك متوافق
++ * للخلف، ما يكسر أي كود ثاني ولا يرفض كتابات على تاسكات قديمة بدون داعٍ).
+  *
+- * يرجع: { conflict: false } لو الكتابة تمّت، أو { conflict: true, serverLastUpdate }
++ * يرجع: { conflict: false } لو الكتابة تمّت، أو { conflict: true, serverSyncTs }
+  * لو رُفضت بسبب تعارض.
+  */
+-export async function updateUserDocIfNotStale(uid, collectionName, docId, partialData, expectedLastUpdate) {
++export async function updateUserDocIfNotStale(uid, collectionName, docId, partialData, expectedSyncTs) {
+   const db = await getUserScopedDb();
+   const ref = doc(db, 'users', uid, collectionName, docId);
+ 
+-  if (expectedLastUpdate) {
++  if (expectedSyncTs) {
+     const snap = await getDoc(ref);
+     if (snap.exists()) {
+-      const serverLastUpdate = snap.data()?.lastUpdate;
+-      if (serverLastUpdate && serverLastUpdate > expectedLastUpdate) {
+-        return { conflict: true, serverLastUpdate };
++      const serverSyncTs = snap.data()?._syncTs;
++      if (serverSyncTs && serverSyncTs > expectedSyncTs) {
++        return { conflict: true, serverSyncTs };
+       }
+     }
+   }
+ 
+-  await setDoc(ref, partialData, { merge: true });
++  await setDoc(ref, { ...partialData, _syncTs: new Date().toISOString() }, { merge: true });
+   return { conflict: false };
+ }
+ 
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index ede183b..3ed919f 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -100,13 +100,14 @@ export const useTasksStore = create(
+           // بس، ويرجع الأصل يظهر بأي مزامنة كاملة لاحقة. الآن 3 محاولات + تحذير.
+           //
+           // ⚠️ إضافة جديدة بطلب صريح ("آلية آمنة" بعد حادثة الجوال بكود قديم):
+-          // قبل الكتابة، نقارن lastUpdate الحالي بالسيرفر مع آخر نسخة كان هذا
+-          // الجهاز يعرفها (original.lastUpdate). لو السيرفر عنده تحديث أحدث ما
+-          // وصل لهذا الجهاز بعد، نرفض الكتابة (بدل ما تمسحه)، وننبّه المستخدم —
+-          // الاستماع اللحظي هيجيب النسخة الصحيحة تلقائياً خلال ثواني.
++          // قبل الكتابة، نقارن _syncTs الحالي بالسيرفر (تاريخ+وقت بدقة الثانية،
++          // مو lastUpdate اليومي) مع آخر نسخة كان هذا الجهاز يعرفها. لو السيرفر
++          // عنده تحديث أحدث ما وصل لهذا الجهاز بعد، نرفض الكتابة (بدل ما تمسحه)،
++          // ونعلّم التاسك محلياً بدل ما نكتب — الاستماع اللحظي هيجيب النسخة
++          // الصحيحة تلقائياً خلال ثواني.
+           retryFirestoreWrite(
+             async () => {
+-              const result = await tasksService.updateIfNotStale(uid, id, partialData, original.lastUpdate);
++              const result = await tasksService.updateIfNotStale(uid, id, partialData, original._syncTs);
+               if (result.conflict) {
+                 // ⚠️ إضافة بطلب صريح: بدل تنبيه عابر بس، نعلّم التاسك محلياً
+                 // "عالق" (نقطة برتقالية وامضة + تاريخ آخر تحديث برتقالي) — يبقى
+@@ -276,7 +277,7 @@ export const useTasksStore = create(
+           // راجع الشرح المفصّل بـupdateTask أعلى بهذا الملف، نفس المبدأ بالضبط.
+           retryFirestoreWrite(
+             async () => {
+-              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
++              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?._syncTs);
+               if (result.conflict) {
+                 set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
+               } else {
+@@ -308,7 +309,7 @@ export const useTasksStore = create(
+         if (updated && uid && updated.workspaceId === null) {
+           retryFirestoreWrite(
+             async () => {
+-              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
++              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?._syncTs);
+               if (result.conflict) {
+                 set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
+               } else {

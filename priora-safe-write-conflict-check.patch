@@ -1,0 +1,164 @@
+diff --git a/src/services/tasksService.js b/src/services/tasksService.js
+index 99d6241..6daf76c 100644
+--- a/src/services/tasksService.js
++++ b/src/services/tasksService.js
+@@ -2,7 +2,7 @@
+ // خدمة التاسكات الشخصية — مسار التخزين: users/{uid}/tasks/{taskId}
+ // نسخة مُعاد كتابتها بوضوح من المتغير `he` بالكود الأصلي المضغوط.
+ 
+-import { saveUserDoc, updateUserDoc, deleteUserDoc, onUserCollection } from './userScopedCrud';
++import { saveUserDoc, updateUserDoc, updateUserDocIfNotStale, deleteUserDoc, onUserCollection } from './userScopedCrud';
+ 
+ export const tasksService = {
+   save: (uid, task) => saveUserDoc(uid, 'tasks', task.id, task),
+@@ -10,6 +10,11 @@ export const tasksService = {
+   // ⚠️ إضافة بطلب صريح — راجع الشرح المفصّل بـuserScopedCrud.js (updateUserDoc).
+   update: (uid, taskId, partialData) => updateUserDoc(uid, 'tasks', taskId, partialData),
+ 
++  // ⚠️ إضافة جديدة بطلب صريح — نفس update لكن ترفض الكتابة لو السيرفر عنده
++  // نسخة أحدث من اللي يعرفها العميل. راجع الشرح المفصّل بـupdateUserDocIfNotStale.
++  updateIfNotStale: (uid, taskId, partialData, expectedLastUpdate) =>
++    updateUserDocIfNotStale(uid, 'tasks', taskId, partialData, expectedLastUpdate),
++
+   delete: (uid, taskId) => deleteUserDoc(uid, 'tasks', taskId),
+ 
+   /**
+diff --git a/src/services/userScopedCrud.js b/src/services/userScopedCrud.js
+index 6023d9d..350a4ac 100644
+--- a/src/services/userScopedCrud.js
++++ b/src/services/userScopedCrud.js
+@@ -6,7 +6,7 @@
+ // هذا هو السبب الحقيقي لإمكانية فصلها لمديولز بأمان: التكرار البرمجي مُجمّع هنا بالفعل
+ // في الكود الأصلي، ولم نُضف تجميعاً جديداً، فقط أوضحناه بالاسم.
+ 
+-import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
++import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+ import { getUserScopedDb } from './firebaseClient';
+ 
+ /**
+@@ -35,6 +35,43 @@ export async function updateUserDoc(uid, collectionName, docId, partialData) {
+   await setDoc(doc(db, 'users', uid, collectionName, docId), partialData, { merge: true });
+ }
+ 
++/**
++ * ⚠️ إضافة جديدة بطلب صريح: "آلية آمنة" تقارن آخر تحديث بالسيرفر قبل الكتابة —
++ * تحمي من جهاز/كود قديم (زي حادثة الجوال) يكتب فوق نسخة أحدث بدون علمه.
++ *
++ * الفكرة: قبل أي كتابة، نقرأ المستند الحالي فعلياً من Firestore أولاً (getDoc)،
++ * ونقارن حقل lastUpdate فيه مع "آخر نسخة كان العميل يعرفها" (expectedLastUpdate —
++ * القيمة اللي كانت عند العميل قبل ما يسوي تعديله). لو السيرفر عنده تحديث أحدث
++ * من اللي كان العميل يعرفه، معناته صار تعديل بمكان/جهاز ثاني ما وصل لهذا العميل
++ * بعد — فنرفض الكتابة (بدل ما تمسحه بصمت)، ونرجّع علامة "متعارض" للمستدعي يقرر
++ * وش يسوي (عادة: تنبيه المستخدم + الاعتماد على الاستماع اللحظي يجيب النسخة
++ * الصحيحة تلقائياً بعد ثواني).
++ *
++ * لو المستند غير موجود أصلاً، أو ما فيه lastUpdate محفوظ، أو expectedLastUpdate
++ * غير مُمرَّر (استدعاء قديم ما يدعم الفحص) — نكتب عادي بدون فحص (سلوك متوافق
++ * للخلف، ما يكسر أي كود ثاني).
++ *
++ * يرجع: { conflict: false } لو الكتابة تمّت، أو { conflict: true, serverLastUpdate }
++ * لو رُفضت بسبب تعارض.
++ */
++export async function updateUserDocIfNotStale(uid, collectionName, docId, partialData, expectedLastUpdate) {
++  const db = await getUserScopedDb();
++  const ref = doc(db, 'users', uid, collectionName, docId);
++
++  if (expectedLastUpdate) {
++    const snap = await getDoc(ref);
++    if (snap.exists()) {
++      const serverLastUpdate = snap.data()?.lastUpdate;
++      if (serverLastUpdate && serverLastUpdate > expectedLastUpdate) {
++        return { conflict: true, serverLastUpdate };
++      }
++    }
++  }
++
++  await setDoc(ref, partialData, { merge: true });
++  return { conflict: false };
++}
++
+ /**
+  * يحذف مستند واحد من users/{uid}/{collectionName}/{docId}
+  */
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index 450892d..b7bdd44 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -98,9 +98,21 @@ export const useTasksStore = create(
+           // بعد مسح كاش): نفس فئة خلل الفولدرات بالضبط — كتابة fire-and-forget
+           // بدون إعادة محاولة. فشل شبكي لحظي وقت النقل يخلي التغيير "زومبي" محلياً
+           // بس، ويرجع الأصل يظهر بأي مزامنة كاملة لاحقة. الآن 3 محاولات + تحذير.
+-          retryFirestoreWrite(() => tasksService.update(uid, id, partialData), {
+-            onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error'),
+-          });
++          //
++          // ⚠️ إضافة جديدة بطلب صريح ("آلية آمنة" بعد حادثة الجوال بكود قديم):
++          // قبل الكتابة، نقارن lastUpdate الحالي بالسيرفر مع آخر نسخة كان هذا
++          // الجهاز يعرفها (original.lastUpdate). لو السيرفر عنده تحديث أحدث ما
++          // وصل لهذا الجهاز بعد، نرفض الكتابة (بدل ما تمسحه)، وننبّه المستخدم —
++          // الاستماع اللحظي هيجيب النسخة الصحيحة تلقائياً خلال ثواني.
++          retryFirestoreWrite(
++            async () => {
++              const result = await tasksService.updateIfNotStale(uid, id, partialData, original.lastUpdate);
++              if (result.conflict) {
++                showToast(`"${original.name}" was updated elsewhere — showing you the latest version`, 'error');
++              }
++            },
++            { onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error') }
++          );
+         }
+ 
+         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
+@@ -238,6 +250,8 @@ export const useTasksStore = create(
+        * الشخصي (تحديث جزئي، بإعادة محاولة لضمان عدم فشلها بصمت).
+        */
+       shareTaskToWs: (taskId, wsId) => {
++        const before = get().tasks.find((t) => t.id === taskId);
++
+         set((state) => ({
+           tasks: state.tasks.map((t) =>
+             t.id === taskId ? { ...t, sharedToWsIds: [...new Set([...(t.sharedToWsIds ?? []), wsId])] } : t
+@@ -251,15 +265,23 @@ export const useTasksStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && updated.workspaceId === null) {
+-          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
+-            onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error'),
+-          });
++          // ⚠️ إضافة جديدة بطلب صريح ("آلية آمنة" بعد حادثة الجوال بكود قديم) —
++          // راجع الشرح المفصّل بـupdateTask أعلى بهذا الملف، نفس المبدأ بالضبط.
++          retryFirestoreWrite(
++            async () => {
++              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
++              if (result.conflict) showToast(`"${updated.name}" was updated elsewhere — showing you the latest version`, 'error');
++            },
++            { onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error') }
++          );
+         }
+       },
+ 
+       // ⚠️ نفس تصحيح shareTaskToWs بالضبط — نفس الخلل، بس بالاتجاه المعاكس
+       // (إلغاء مشاركة). كانت ما تحفظ sharedToWsIds المُحدَّث بالمستند الشخصي.
+       unshareTaskFromWs: (taskId, wsId) => {
++        const before = get().tasks.find((t) => t.id === taskId);
++
+         set((state) => ({
+           tasks: state.tasks.map((t) =>
+             t.id === taskId ? { ...t, sharedToWsIds: (t.sharedToWsIds ?? []).filter((id) => id !== wsId) } : t
+@@ -273,9 +295,13 @@ export const useTasksStore = create(
+         const updated = get().tasks.find((t) => t.id === taskId);
+         const uid = useAuthStore.getState().user?.uid;
+         if (updated && uid && updated.workspaceId === null) {
+-          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
+-            onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error'),
+-          });
++          retryFirestoreWrite(
++            async () => {
++              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
++              if (result.conflict) showToast(`"${updated.name}" was updated elsewhere — showing you the latest version`, 'error');
++            },
++            { onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error') }
++          );
+         }
+       },
+ 

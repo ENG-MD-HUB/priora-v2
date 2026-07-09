@@ -1,0 +1,45 @@
+diff --git a/src/real-styles.css b/src/real-styles.css
+index 7ef43cd..c178468 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -181,6 +181,12 @@ mark {
+   background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-sm);
+   width: 100%; color: var(--text); font-family: var(--font); transition: var(--tr);
+   outline: none; padding: 8px 11px; font-size: 13px; box-sizing: border-box;
++  /* ⚠️ تصحيح خلل حقيقي بطلب صريح: عناصر تحكم النموذج الأصلية (أيقونة تقويم
++     type="date"، سهم القائمة type="select") ما تتأثر بـcolor العادي — المتصفح
++     يرسمها افتراضياً بـ"مخطط فاتح" (light) حتى بخلفية داكنة، فتبدو باهتة/رمادية
++     وكأنها معطّلة رغم إنها شغّالة تماماً. color-scheme: dark يخلي المتصفح يرسم
++     هذي العناصر بالمخطط الداكن المناسب لواجهة التطبيق. */
++  color-scheme: dark;
+ }
+ .input:focus, .textarea:focus, .select:focus {
+   border-color: var(--accent); background: var(--surface);
+diff --git a/vercel.json b/vercel.json
+new file mode 100644
+index 0000000..3b6acf8
+--- /dev/null
++++ b/vercel.json
+@@ -0,0 +1,22 @@
++{
++  "headers": [
++    {
++      "source": "/",
++      "headers": [
++        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
++      ]
++    },
++    {
++      "source": "/index.html",
++      "headers": [
++        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
++      ]
++    },
++    {
++      "source": "/manifest.json",
++      "headers": [
++        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
++      ]
++    }
++  ]
++}

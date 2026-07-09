@@ -19,7 +19,16 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
   const latestNote = task.timeline.length > 0 ? task.timeline[0].text : '—';
   const highlightedName = searchQuery ? highlightMatch(task.name, searchQuery) : undefined;
   const highlightedNote = searchQuery ? highlightMatch(latestNote, searchQuery) : undefined;
-  const dotClass = task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
+  const dotClass = task._conflictPending
+    ? 'sdot sdot-conflict'
+    : task.priority === 'urgent'
+    ? 'sdot sdot-urgent'
+    : updatedToday
+    ? 'sdot sdot-today'
+    : `sdot sdot-${task.status}`;
+  // ⚠️ إضافة بطلب صريح: تعديل صار وأنت أوفلاين وتعارض مع نسخة أحدث بالسيرفر —
+  // عالق محلياً بهذا الجهاز بس، لسا ما ارتفع. برتقالي بدل لون daysColor العادي.
+  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
 
   return (
     <div
@@ -49,7 +58,7 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
       )}
 
       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
+        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
         {days > 0 && days < 9999 && (
           <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, color: daysColor, background: `color-mix(in srgb,${daysColor} 12%,var(--surface2))`, border: `1px solid color-mix(in srgb,${daysColor} 25%,var(--border))`, borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
             +{days}

@@ -98,9 +98,29 @@ export const useTasksStore = create(
           // بعد مسح كاش): نفس فئة خلل الفولدرات بالضبط — كتابة fire-and-forget
           // بدون إعادة محاولة. فشل شبكي لحظي وقت النقل يخلي التغيير "زومبي" محلياً
           // بس، ويرجع الأصل يظهر بأي مزامنة كاملة لاحقة. الآن 3 محاولات + تحذير.
-          retryFirestoreWrite(() => tasksService.update(uid, id, partialData), {
-            onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error'),
-          });
+          //
+          // ⚠️ إضافة جديدة بطلب صريح ("آلية آمنة" بعد حادثة الجوال بكود قديم):
+          // قبل الكتابة، نقارن _syncTs الحالي بالسيرفر (تاريخ+وقت بدقة الثانية،
+          // مو lastUpdate اليومي) مع آخر نسخة كان هذا الجهاز يعرفها. لو السيرفر
+          // عنده تحديث أحدث ما وصل لهذا الجهاز بعد، نرفض الكتابة (بدل ما تمسحه)،
+          // ونعلّم التاسك محلياً بدل ما نكتب — الاستماع اللحظي هيجيب النسخة
+          // الصحيحة تلقائياً خلال ثواني.
+          retryFirestoreWrite(
+            async () => {
+              const result = await tasksService.updateIfNotStale(uid, id, partialData, original._syncTs);
+              if (result.conflict) {
+                // ⚠️ إضافة بطلب صريح: بدل تنبيه عابر بس، نعلّم التاسك محلياً
+                // "عالق" (نقطة برتقالية وامضة + تاريخ آخر تحديث برتقالي) — يبقى
+                // واضح بالواجهة لحد ما يُحل، مو بس لحظة الحفظ. الكتابة المتعارضة
+                // نفسها ما تُرسَل لـFirestore إطلاقاً (راجع updateIfNotStale) —
+                // فلا شي يُمسح أو ينكسر بالسيرفر.
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, _conflictPending: true } : t)) }));
+              } else {
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, _conflictPending: false } : t)) }));
+              }
+            },
+            { onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error') }
+          );
         }
 
         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
@@ -238,6 +258,8 @@ export const useTasksStore = create(
        * الشخصي (تحديث جزئي، بإعادة محاولة لضمان عدم فشلها بصمت).
        */
       shareTaskToWs: (taskId, wsId) => {
+        const before = get().tasks.find((t) => t.id === taskId);
+
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === taskId ? { ...t, sharedToWsIds: [...new Set([...(t.sharedToWsIds ?? []), wsId])] } : t
@@ -251,15 +273,27 @@ export const useTasksStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && updated.workspaceId === null) {
-          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
-            onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error'),
-          });
+          // ⚠️ إضافة جديدة بطلب صريح ("آلية آمنة" بعد حادثة الجوال بكود قديم) —
+          // راجع الشرح المفصّل بـupdateTask أعلى بهذا الملف، نفس المبدأ بالضبط.
+          retryFirestoreWrite(
+            async () => {
+              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?._syncTs);
+              if (result.conflict) {
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
+              } else {
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: false } : t)) }));
+              }
+            },
+            { onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error') }
+          );
         }
       },
 
       // ⚠️ نفس تصحيح shareTaskToWs بالضبط — نفس الخلل، بس بالاتجاه المعاكس
       // (إلغاء مشاركة). كانت ما تحفظ sharedToWsIds المُحدَّث بالمستند الشخصي.
       unshareTaskFromWs: (taskId, wsId) => {
+        const before = get().tasks.find((t) => t.id === taskId);
+
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === taskId ? { ...t, sharedToWsIds: (t.sharedToWsIds ?? []).filter((id) => id !== wsId) } : t
@@ -273,9 +307,17 @@ export const useTasksStore = create(
         const updated = get().tasks.find((t) => t.id === taskId);
         const uid = useAuthStore.getState().user?.uid;
         if (updated && uid && updated.workspaceId === null) {
-          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
-            onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error'),
-          });
+          retryFirestoreWrite(
+            async () => {
+              const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?._syncTs);
+              if (result.conflict) {
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
+              } else {
+                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: false } : t)) }));
+              }
+            },
+            { onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error') }
+          );
         }
       },
 

@@ -24,8 +24,14 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
   const days = daysSince(task.lastUpdate);
   const daysColor = getDaysSinceColor(days);
   const updatedToday = wasUpdatedToday(task);
-  const dotClass =
-    task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
+  const dotClass = task._conflictPending
+    ? 'sdot sdot-conflict'
+    : task.priority === 'urgent'
+    ? 'sdot sdot-urgent'
+    : updatedToday
+    ? 'sdot sdot-today'
+    : `sdot sdot-${task.status}`;
+  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
 
   return (
     <div
@@ -48,7 +54,7 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
       </div>
 
       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>
+        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>
           {formatDateForDisplay(task.lastUpdate)}
         </span>
         {days > 0 && days < 9999 && (

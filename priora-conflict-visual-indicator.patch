@@ -1,0 +1,148 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 330bfb6..75b6b1c 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -101,8 +101,19 @@ function AuthenticatedApp() {
+   useEffect(() => {
+     if (!user) return;
+ 
+-    const unsubTasks = tasksService.onTasks(user.uid, (tasks) =>
+-      useTasksStore.setState((state) => ({ tasks, trash: state.trash }))
++    // ⚠️ تصحيح خلل حقيقي بطلب صريح: الاستماع اللحظي يستبدل كل tasks بالكامل من
++    // السيرفر بأي تحديث — كان هذا يمسح علامة _conflictPending المحلية البحتة
++    // (مو موجودة بـFirestore أصلاً) بأول حدث snapshot غير مرتبط حتى. الحل: نحافظ
++    // على العلامة لأي تاسك كانت مُعلَّمة محلياً، لحد ما تُحل فعلياً (نجاح إعادة
++    // الكتابة يمسحها من الاستور مباشرة، مو من هنا).
++    const unsubTasks = tasksService.onTasks(user.uid, (serverTasks) =>
++      useTasksStore.setState((state) => ({
++        tasks: serverTasks.map((st) => {
++          const local = state.tasks.find((t) => t.id === st.id);
++          return local?._conflictPending ? { ...st, _conflictPending: true } : st;
++        }),
++        trash: state.trash,
++      }))
+     );
+     const unsubTrash = trashService.onTrash(user.uid, (trash) =>
+       useTasksStore.setState((state) => ({ tasks: state.tasks, trash }))
+diff --git a/src/components/FolderTaskRow.jsx b/src/components/FolderTaskRow.jsx
+index a62b961..200d3f1 100644
+--- a/src/components/FolderTaskRow.jsx
++++ b/src/components/FolderTaskRow.jsx
+@@ -19,7 +19,16 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
+   const latestNote = task.timeline.length > 0 ? task.timeline[0].text : '—';
+   const highlightedName = searchQuery ? highlightMatch(task.name, searchQuery) : undefined;
+   const highlightedNote = searchQuery ? highlightMatch(latestNote, searchQuery) : undefined;
+-  const dotClass = task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
++  const dotClass = task._conflictPending
++    ? 'sdot sdot-conflict'
++    : task.priority === 'urgent'
++    ? 'sdot sdot-urgent'
++    : updatedToday
++    ? 'sdot sdot-today'
++    : `sdot sdot-${task.status}`;
++  // ⚠️ إضافة بطلب صريح: تعديل صار وأنت أوفلاين وتعارض مع نسخة أحدث بالسيرفر —
++  // عالق محلياً بهذا الجهاز بس، لسا ما ارتفع. برتقالي بدل لون daysColor العادي.
++  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
+ 
+   return (
+     <div
+@@ -49,7 +58,7 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
+       )}
+ 
+       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+-        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
++        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
+         {days > 0 && days < 9999 && (
+           <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, color: daysColor, background: `color-mix(in srgb,${daysColor} 12%,var(--surface2))`, border: `1px solid color-mix(in srgb,${daysColor} 25%,var(--border))`, borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
+             +{days}
+diff --git a/src/components/TaskRow.jsx b/src/components/TaskRow.jsx
+index c5a7311..c6f7895 100644
+--- a/src/components/TaskRow.jsx
++++ b/src/components/TaskRow.jsx
+@@ -24,8 +24,14 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
+   const days = daysSince(task.lastUpdate);
+   const daysColor = getDaysSinceColor(days);
+   const updatedToday = wasUpdatedToday(task);
+-  const dotClass =
+-    task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
++  const dotClass = task._conflictPending
++    ? 'sdot sdot-conflict'
++    : task.priority === 'urgent'
++    ? 'sdot sdot-urgent'
++    : updatedToday
++    ? 'sdot sdot-today'
++    : `sdot sdot-${task.status}`;
++  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
+ 
+   return (
+     <div
+@@ -48,7 +54,7 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
+       </div>
+ 
+       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+-        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>
++        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>
+           {formatDateForDisplay(task.lastUpdate)}
+         </span>
+         {days > 0 && days < 9999 && (
+diff --git a/src/real-styles.css b/src/real-styles.css
+index c178468..744cdc9 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -128,6 +128,10 @@ input, textarea, select { font-family: var(--font); }
+ 
+ .sdot { background: currentColor; border-radius: 50%; flex-shrink: 0; width: 7px; height: 7px; display: inline-block; }
+ .sdot-urgent { background: var(--red); animation: 1.4s ease-in-out infinite blink; }
++/* ⚠️ إضافة بطلب صريح: نقطة برتقالية وامضة للتاسك اللي عنده تعديل عالق محلياً
++   (اتكتب وأنت أوفلاين، تعارض مع نسخة أحدث بالسيرفر — لسا ما ارتفع). أولوية أعلى
++   من كل الألوان الثانية حتى urgent، لأنها تعني "فيه شي يحتاج انتباهك الآن". */
++.sdot-conflict { background: var(--orange); animation: 1.4s ease-in-out infinite blink; }
+ .sdot-active, .sdot-waiting, .sdot-ontrack { background: var(--accent); }
+ .sdot-closed { background: var(--text3); }
+ .sdot-today { background: color-mix(in srgb, var(--accent) 50%, transparent); }
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index b7bdd44..ede183b 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -108,7 +108,14 @@ export const useTasksStore = create(
+             async () => {
+               const result = await tasksService.updateIfNotStale(uid, id, partialData, original.lastUpdate);
+               if (result.conflict) {
+-                showToast(`"${original.name}" was updated elsewhere — showing you the latest version`, 'error');
++                // ⚠️ إضافة بطلب صريح: بدل تنبيه عابر بس، نعلّم التاسك محلياً
++                // "عالق" (نقطة برتقالية وامضة + تاريخ آخر تحديث برتقالي) — يبقى
++                // واضح بالواجهة لحد ما يُحل، مو بس لحظة الحفظ. الكتابة المتعارضة
++                // نفسها ما تُرسَل لـFirestore إطلاقاً (راجع updateIfNotStale) —
++                // فلا شي يُمسح أو ينكسر بالسيرفر.
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, _conflictPending: true } : t)) }));
++              } else {
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, _conflictPending: false } : t)) }));
+               }
+             },
+             { onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error') }
+@@ -270,7 +277,11 @@ export const useTasksStore = create(
+           retryFirestoreWrite(
+             async () => {
+               const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
+-              if (result.conflict) showToast(`"${updated.name}" was updated elsewhere — showing you the latest version`, 'error');
++              if (result.conflict) {
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
++              } else {
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: false } : t)) }));
++              }
+             },
+             { onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error') }
+           );
+@@ -298,7 +309,11 @@ export const useTasksStore = create(
+           retryFirestoreWrite(
+             async () => {
+               const result = await tasksService.updateIfNotStale(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }, before?.lastUpdate);
+-              if (result.conflict) showToast(`"${updated.name}" was updated elsewhere — showing you the latest version`, 'error');
++              if (result.conflict) {
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: true } : t)) }));
++              } else {
++                set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, _conflictPending: false } : t)) }));
++              }
+             },
+             { onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error') }
+           );

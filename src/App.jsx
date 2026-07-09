@@ -99,8 +99,19 @@ function AuthenticatedApp() {
   useEffect(() => {
     if (!user) return;
 
-    const unsubTasks = tasksService.onTasks(user.uid, (tasks) =>
-      useTasksStore.setState((state) => ({ tasks, trash: state.trash }))
+    // ⚠️ تصحيح خلل حقيقي بطلب صريح: الاستماع اللحظي يستبدل كل tasks بالكامل من
+    // السيرفر بأي تحديث — كان هذا يمسح علامة _conflictPending المحلية البحتة
+    // (مو موجودة بـFirestore أصلاً) بأول حدث snapshot غير مرتبط حتى. الحل: نحافظ
+    // على العلامة لأي تاسك كانت مُعلَّمة محلياً، لحد ما تُحل فعلياً (نجاح إعادة
+    // الكتابة يمسحها من الاستور مباشرة، مو من هنا).
+    const unsubTasks = tasksService.onTasks(user.uid, (serverTasks) =>
+      useTasksStore.setState((state) => ({
+        tasks: serverTasks.map((st) => {
+          const local = state.tasks.find((t) => t.id === st.id);
+          return local?._conflictPending ? { ...st, _conflictPending: true } : st;
+        }),
+        trash: state.trash,
+      }))
     );
     const unsubTrash = trashService.onTrash(user.uid, (trash) =>
       useTasksStore.setState((state) => ({ tasks: state.tasks, trash }))
