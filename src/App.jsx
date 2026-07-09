@@ -27,6 +27,7 @@ import { trashService } from './services/trashService';
 import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
 import { useWorkspaceFollowupNotifications } from './utils/useWorkspaceFollowupNotifications';
 import { repairZombieItems } from './utils/repairZombieItems';
+import './utils/diagnoseSharedTasks';
 import { useFontScale } from './utils/useFontScale';
 import { useIdleScreensaver } from './utils/useIdleScreensaver';
 import { Screensaver } from './components/Screensaver';
