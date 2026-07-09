@@ -25,6 +25,8 @@ import { generateId } from '../utils/generateId';
 import { getEffectiveToday } from '../utils/taskDateLogic';
 import { buildStorageKey } from '../utils/anonUserTracking';
 import { TRASH_EXPIRY_MS } from '../utils/trashConstants';
+import { retryFirestoreWrite } from '../utils/retryFirestoreWrite';
+import { showToast } from './toastStore';
 
 // علم اختباري فقط (مو موجود بالكود الأصلي) — نفس النمط المتبع بقسمي Workspaces
 // و Contacts لتفادي تعليق الاتصال الحقيقي بـ Firestore وقت الاختبار بمفاتيح فاضية.
@@ -92,7 +94,13 @@ export const useTasksStore = create(
         if (!original) return;
 
         if (original.workspaceId === null && !_disableFirestoreSyncForTesting) {
-          tasksService.update(uid, id, partialData).catch(console.error);
+          // ⚠️ تصحيح خلل حقيقي (بعد بلاغ فعلي: نقل تاسك لفولدر آخر يرجع لـGeneral
+          // بعد مسح كاش): نفس فئة خلل الفولدرات بالضبط — كتابة fire-and-forget
+          // بدون إعادة محاولة. فشل شبكي لحظي وقت النقل يخلي التغيير "زومبي" محلياً
+          // بس، ويرجع الأصل يظهر بأي مزامنة كاملة لاحقة. الآن 3 محاولات + تحذير.
+          retryFirestoreWrite(() => tasksService.update(uid, id, partialData), {
+            onFinalFailure: () => showToast(`Couldn't save changes to "${original.name}" — check your connection and try again`, 'error'),
+          });
         }
 
         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
@@ -123,7 +131,12 @@ export const useTasksStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && original.workspaceId === null && !_disableFirestoreSyncForTesting) {
-          tasksService.delete(uid, id).catch(console.error);
+          // ⚠️ تصحيح خلل حقيقي (بعد بلاغ فعلي: تاسك محذوف من "المكتملة" رجع
+          // يظهر بعد مسح كاش) — نفس فئة خلل الفولدرات بالضبط. الآن 3 محاولات
+          // + تحذير بدل فشل صامت.
+          retryFirestoreWrite(() => tasksService.delete(uid, id), {
+            onFinalFailure: () => showToast(`Couldn't fully delete "${original.name}" — check your connection and try again`, 'error'),
+          });
           trashService.save(uid, trashedTask).catch(console.error);
         }
 
@@ -155,8 +168,10 @@ export const useTasksStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && restoredTask.workspaceId === null && !_disableFirestoreSyncForTesting) {
-          tasksService.save(uid, restoredTask).catch(console.error);
-          trashService.delete(uid, id).catch(console.error);
+          retryFirestoreWrite(() => tasksService.save(uid, restoredTask), {
+            onFinalFailure: () => showToast(`Couldn't restore "${restoredTask.name}" — check your connection and try again`, 'error'),
+          });
+          retryFirestoreWrite(() => trashService.delete(uid, id));
         }
 
         if (restoredTask.folderId) {
@@ -176,7 +191,9 @@ export const useTasksStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && !_disableFirestoreSyncForTesting) {
-          trashService.delete(uid, id).catch(console.error);
+          retryFirestoreWrite(() => trashService.delete(uid, id), {
+            onFinalFailure: () => showToast(`Couldn't permanently delete the task — check your connection and try again`, 'error'),
+          });
         }
       },
 
@@ -273,7 +290,9 @@ export const useTasksStore = create(
         if (!updated || updated.workspaceId !== null) return;
 
         const partialUpdate = { timeline: updated.timeline, lastUpdate: updated.lastUpdate };
-        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        retryFirestoreWrite(() => tasksService.update(uid, taskId, partialUpdate), {
+          onFinalFailure: () => showToast(`Couldn't save the update to "${updated.name}" — check your connection and try again`, 'error'),
+        });
         (updated.sharedToWsIds ?? []).forEach((wsId) =>
           wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
         );
@@ -298,7 +317,9 @@ export const useTasksStore = create(
         if (!task || task.workspaceId !== null) return;
 
         const partialUpdate = { timeline: task.timeline, lastUpdate: task.lastUpdate };
-        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        retryFirestoreWrite(() => tasksService.update(uid, taskId, partialUpdate), {
+          onFinalFailure: () => showToast(`Couldn't save the correction to "${task.name}" — check your connection and try again`, 'error'),
+        });
         (task.sharedToWsIds ?? []).forEach((wsId) =>
           wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
         );
@@ -319,7 +340,9 @@ export const useTasksStore = create(
         if (!task || task.workspaceId !== null) return;
 
         const partialUpdate = { timeline: task.timeline };
-        tasksService.update(uid, taskId, partialUpdate).catch(console.error);
+        retryFirestoreWrite(() => tasksService.update(uid, taskId, partialUpdate), {
+          onFinalFailure: () => showToast(`Couldn't delete the note on "${task.name}" — check your connection and try again`, 'error'),
+        });
         (task.sharedToWsIds ?? []).forEach((wsId) =>
           wsTaskService.update(wsId, taskId, partialUpdate).catch(console.error)
         );
