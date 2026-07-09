@@ -1,0 +1,164 @@
+diff --git a/src/components/NewTaskModal.jsx b/src/components/NewTaskModal.jsx
+index d5e6ae2..c34d1a6 100644
+--- a/src/components/NewTaskModal.jsx
++++ b/src/components/NewTaskModal.jsx
+@@ -11,9 +11,10 @@
+ import { useState } from 'react';
+ import { Modal } from './Modal';
+ import { InvolvedContactsTypeahead } from './InvolvedContactsTypeahead';
++import { getEffectiveToday } from '../utils/taskDateLogic';
+ 
+ export function NewTaskModal({ folderId, onClose, onSave }) {
+-  const today = new Date().toISOString().split('T')[0];
++  const today = getEffectiveToday();
+ 
+   const [name, setName] = useState('');
+   const [desc, setDesc] = useState('');
+diff --git a/src/components/NewWorkspaceTaskModal.jsx b/src/components/NewWorkspaceTaskModal.jsx
+index 2b410ab..1db2a33 100644
+--- a/src/components/NewWorkspaceTaskModal.jsx
++++ b/src/components/NewWorkspaceTaskModal.jsx
+@@ -18,6 +18,7 @@ import { useContactsStore } from '../store/contactsStore';
+ import { wsTaskService } from '../services/wsTaskService';
+ import { notificationService } from '../services/notificationService';
+ import { showToast } from '../store/toastStore';
++import { getEffectiveToday } from '../utils/taskDateLogic';
+ import { generateId } from '../utils/generateId';
+ 
+ export function NewWorkspaceTaskModal({ wsId, wsName, onClose }) {
+@@ -36,7 +37,7 @@ export function NewWorkspaceTaskModal({ wsId, wsName, onClose }) {
+     if (!name.trim() || !user) return;
+ 
+     setSaving(true);
+-    const today = new Date().toISOString().split('T')[0];
++    const today = getEffectiveToday();
+     const timeline = firstUpdateNote.trim()
+       ? [{ id: generateId(), text: firstUpdateNote.trim(), date: today, ts: new Date().toISOString(), authorId: user.uid, authorName: user.displayName ?? 'Unknown', authorAvatar: user.photoURL ?? null }]
+       : [];
+diff --git a/src/components/WorkspaceTaskDetailModal.jsx b/src/components/WorkspaceTaskDetailModal.jsx
+index 3487896..f1859b4 100644
+--- a/src/components/WorkspaceTaskDetailModal.jsx
++++ b/src/components/WorkspaceTaskDetailModal.jsx
+@@ -13,7 +13,7 @@ import { useContactsStore } from '../store/contactsStore';
+ import { useTasksStore } from '../store/tasksStore';
+ import { wsTaskService } from '../services/wsTaskService';
+ import { tasksService } from '../services/tasksService';
+-import { formatDateForDisplay } from '../utils/taskDateLogic';
++import { formatDateForDisplay, getEffectiveToday } from '../utils/taskDateLogic';
+ import { WorkspaceTaskUpdateModal } from './WorkspaceTaskUpdateModal';
+ 
+ const STATUS_LABELS = { active: 'Action Required', waiting: 'Waiting Feedback', ontrack: 'On Track', closed: 'Completed' };
+@@ -151,7 +151,7 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
+                     <div>
+                       <textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="textarea" style={{ marginBottom: 6, minHeight: 54 }} autoFocus />
+                       <div style={{ display: 'flex', gap: 6 }}>
+-                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={new Date().toISOString().split('T')[0]} />
++                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={getEffectiveToday()} />
+                         <button onClick={() => saveEditedEntry(entry.id)} style={{ padding: '5px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontFamily: 'var(--font)', cursor: 'pointer' }}>Save</button>
+                         <button onClick={() => setEditingEntryId(null)} className="btn-cancel" style={{ padding: '5px 9px', fontSize: 12 }}>Cancel</button>
+                       </div>
+diff --git a/src/components/WorkspaceTaskUpdateModal.jsx b/src/components/WorkspaceTaskUpdateModal.jsx
+index 0ad9a78..28d9b96 100644
+--- a/src/components/WorkspaceTaskUpdateModal.jsx
++++ b/src/components/WorkspaceTaskUpdateModal.jsx
+@@ -28,7 +28,7 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
+   const today = getEffectiveToday();
+ 
+   const [noteText, setNoteText] = useState('');
+-  const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
++  const [noteDate, setNoteDate] = useState(today);
+   const [newStatus, setNewStatus] = useState('');
+   const [showFollowup, setShowFollowup] = useState(false);
+   const [followupDate, setFollowupDate] = useState('');
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index 00acaa6..450892d 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -226,6 +226,17 @@ export const useTasksStore = create(
+         }
+       },
+ 
++      /**
++       * يشارك تاسك شخصي مع ورك سبيس.
++       *
++       * ⚠️ تصحيح خلل حقيقي (بعد بلاغ فعلي: علامة "مشترك" تختفي بعد الخروج من
++       * التاسك والرجوع له): كانت هذي الدالة تحفظ sharedToWsIds بالحالة المحلية
++       * فقط + نسخة الورك سبيس الجديدة — **بدون أي كتابة لمستند التاسك الشخصي
++       * بـFirestore نفسه!** يعني أي مزامنة لاحقة (تنقّل بالتطبيق، استماع لحظي،
++       * إعادة تحميل) كانت تجيب النسخة القديمة (قبل المشاركة) من Firestore وتمسح
++       * علامة "مشترك" المحلية المؤقتة. الحل: نكتب sharedToWsIds فعلياً للمستند
++       * الشخصي (تحديث جزئي، بإعادة محاولة لضمان عدم فشلها بصمت).
++       */
+       shareTaskToWs: (taskId, wsId) => {
+         set((state) => ({
+           tasks: state.tasks.map((t) =>
+@@ -234,11 +245,20 @@ export const useTasksStore = create(
+         }));
+ 
+         const updated = get().tasks.find((t) => t.id === taskId);
+-        if (updated && !_disableFirestoreSyncForTesting) {
+-          wsTaskService.save(wsId, updated).catch(console.error);
++        if (!updated || _disableFirestoreSyncForTesting) return;
++
++        wsTaskService.save(wsId, updated).catch(console.error);
++
++        const uid = useAuthStore.getState().user?.uid;
++        if (uid && updated.workspaceId === null) {
++          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
++            onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error'),
++          });
+         }
+       },
+ 
++      // ⚠️ نفس تصحيح shareTaskToWs بالضبط — نفس الخلل، بس بالاتجاه المعاكس
++      // (إلغاء مشاركة). كانت ما تحفظ sharedToWsIds المُحدَّث بالمستند الشخصي.
+       unshareTaskFromWs: (taskId, wsId) => {
+         set((state) => ({
+           tasks: state.tasks.map((t) =>
+@@ -246,8 +266,16 @@ export const useTasksStore = create(
+           ),
+         }));
+ 
+-        if (!_disableFirestoreSyncForTesting) {
+-          wsTaskService.delete(wsId, taskId).catch(console.error);
++        if (_disableFirestoreSyncForTesting) return;
++
++        wsTaskService.delete(wsId, taskId).catch(console.error);
++
++        const updated = get().tasks.find((t) => t.id === taskId);
++        const uid = useAuthStore.getState().user?.uid;
++        if (updated && uid && updated.workspaceId === null) {
++          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
++            onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error'),
++          });
+         }
+       },
+ 
+diff --git a/src/utils/taskDateLogic.js b/src/utils/taskDateLogic.js
+index 848f854..ac357b0 100644
+--- a/src/utils/taskDateLogic.js
++++ b/src/utils/taskDateLogic.js
+@@ -11,11 +11,22 @@
+ /**
+  * يرجع تاريخ "اليوم الفعلي" بصيغة YYYY-MM-DD، مع مراعاة قاعدة حد الساعة 5 فجراً.
+  * نسخة من: N()
++ *
++ * ⚠️ تصحيح خلل حقيقي بطلب صريح: كانت الدالة تفحص الساعة المحلية (getHours — صح)،
++ * لكن تستخرج نص التاريخ عبر toISOString() — واللي يرجع دائماً بتوقيت UTC، بغض
++ * النظر عن توقيت الجهاز المحلي! لأي منطقة توقيت متقدمة عن UTC (زي السعودية،
++ * +3)، بين منتصف الليل وحوالي الساعة 3 فجراً محلياً، يكون التاريخ بـUTC لسا
++ * "أمس" — فتطلع الدالة تاريخ أمس حتى لو الساعة المحلية تجاوزت الـ5 فجراً وصار
++ * "اليوم" فعلياً محلياً. الحل: نبني نص التاريخ يدوياً من مكوّنات التاريخ المحلية
++ * (getFullYear/getMonth/getDate) بدل toISOString، فيطابق التقويم المحلي دائماً.
+  */
+ export function getEffectiveToday() {
+   const now = new Date();
+   if (now.getHours() < 5) now.setDate(now.getDate() - 1);
+-  return now.toISOString().split('T')[0];
++  const year = now.getFullYear();
++  const month = String(now.getMonth() + 1).padStart(2, '0');
++  const day = String(now.getDate()).padStart(2, '0');
++  return `${year}-${month}-${day}`;
+ }
+ 
+ /**

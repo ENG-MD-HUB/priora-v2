@@ -28,7 +28,7 @@ export function WorkspaceTaskUpdateModal({ task, wsId, wsName, onClose }) {
   const today = getEffectiveToday();
 
   const [noteText, setNoteText] = useState('');
-  const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
+  const [noteDate, setNoteDate] = useState(today);
   const [newStatus, setNewStatus] = useState('');
   const [showFollowup, setShowFollowup] = useState(false);
   const [followupDate, setFollowupDate] = useState('');

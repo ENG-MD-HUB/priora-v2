@@ -18,6 +18,7 @@ import { useContactsStore } from '../store/contactsStore';
 import { wsTaskService } from '../services/wsTaskService';
 import { notificationService } from '../services/notificationService';
 import { showToast } from '../store/toastStore';
+import { getEffectiveToday } from '../utils/taskDateLogic';
 import { generateId } from '../utils/generateId';
 
 export function NewWorkspaceTaskModal({ wsId, wsName, onClose }) {
@@ -36,7 +37,7 @@ export function NewWorkspaceTaskModal({ wsId, wsName, onClose }) {
     if (!name.trim() || !user) return;
 
     setSaving(true);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getEffectiveToday();
     const timeline = firstUpdateNote.trim()
       ? [{ id: generateId(), text: firstUpdateNote.trim(), date: today, ts: new Date().toISOString(), authorId: user.uid, authorName: user.displayName ?? 'Unknown', authorAvatar: user.photoURL ?? null }]
       : [];

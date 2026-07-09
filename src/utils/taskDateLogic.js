@@ -11,11 +11,22 @@
 /**
  * يرجع تاريخ "اليوم الفعلي" بصيغة YYYY-MM-DD، مع مراعاة قاعدة حد الساعة 5 فجراً.
  * نسخة من: N()
+ *
+ * ⚠️ تصحيح خلل حقيقي بطلب صريح: كانت الدالة تفحص الساعة المحلية (getHours — صح)،
+ * لكن تستخرج نص التاريخ عبر toISOString() — واللي يرجع دائماً بتوقيت UTC، بغض
+ * النظر عن توقيت الجهاز المحلي! لأي منطقة توقيت متقدمة عن UTC (زي السعودية،
+ * +3)، بين منتصف الليل وحوالي الساعة 3 فجراً محلياً، يكون التاريخ بـUTC لسا
+ * "أمس" — فتطلع الدالة تاريخ أمس حتى لو الساعة المحلية تجاوزت الـ5 فجراً وصار
+ * "اليوم" فعلياً محلياً. الحل: نبني نص التاريخ يدوياً من مكوّنات التاريخ المحلية
+ * (getFullYear/getMonth/getDate) بدل toISOString، فيطابق التقويم المحلي دائماً.
  */
 export function getEffectiveToday() {
   const now = new Date();
   if (now.getHours() < 5) now.setDate(now.getDate() - 1);
-  return now.toISOString().split('T')[0];
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

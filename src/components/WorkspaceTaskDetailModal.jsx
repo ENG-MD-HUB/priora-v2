@@ -13,7 +13,7 @@ import { useContactsStore } from '../store/contactsStore';
 import { useTasksStore } from '../store/tasksStore';
 import { wsTaskService } from '../services/wsTaskService';
 import { tasksService } from '../services/tasksService';
-import { formatDateForDisplay } from '../utils/taskDateLogic';
+import { formatDateForDisplay, getEffectiveToday } from '../utils/taskDateLogic';
 import { WorkspaceTaskUpdateModal } from './WorkspaceTaskUpdateModal';
 
 const STATUS_LABELS = { active: 'Action Required', waiting: 'Waiting Feedback', ontrack: 'On Track', closed: 'Completed' };
@@ -151,7 +151,7 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
                     <div>
                       <textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="textarea" style={{ marginBottom: 6, minHeight: 54 }} autoFocus />
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={new Date().toISOString().split('T')[0]} />
+                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={getEffectiveToday()} />
                         <button onClick={() => saveEditedEntry(entry.id)} style={{ padding: '5px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontFamily: 'var(--font)', cursor: 'pointer' }}>Save</button>
                         <button onClick={() => setEditingEntryId(null)} className="btn-cancel" style={{ padding: '5px 9px', fontSize: 12 }}>Cancel</button>
                       </div>

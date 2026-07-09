@@ -226,6 +226,17 @@ export const useTasksStore = create(
         }
       },
 
+      /**
+       * يشارك تاسك شخصي مع ورك سبيس.
+       *
+       * ⚠️ تصحيح خلل حقيقي (بعد بلاغ فعلي: علامة "مشترك" تختفي بعد الخروج من
+       * التاسك والرجوع له): كانت هذي الدالة تحفظ sharedToWsIds بالحالة المحلية
+       * فقط + نسخة الورك سبيس الجديدة — **بدون أي كتابة لمستند التاسك الشخصي
+       * بـFirestore نفسه!** يعني أي مزامنة لاحقة (تنقّل بالتطبيق، استماع لحظي،
+       * إعادة تحميل) كانت تجيب النسخة القديمة (قبل المشاركة) من Firestore وتمسح
+       * علامة "مشترك" المحلية المؤقتة. الحل: نكتب sharedToWsIds فعلياً للمستند
+       * الشخصي (تحديث جزئي، بإعادة محاولة لضمان عدم فشلها بصمت).
+       */
       shareTaskToWs: (taskId, wsId) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -234,11 +245,20 @@ export const useTasksStore = create(
         }));
 
         const updated = get().tasks.find((t) => t.id === taskId);
-        if (updated && !_disableFirestoreSyncForTesting) {
-          wsTaskService.save(wsId, updated).catch(console.error);
+        if (!updated || _disableFirestoreSyncForTesting) return;
+
+        wsTaskService.save(wsId, updated).catch(console.error);
+
+        const uid = useAuthStore.getState().user?.uid;
+        if (uid && updated.workspaceId === null) {
+          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
+            onFinalFailure: () => showToast(`Couldn't save the share status for "${updated.name}" — check your connection and try again`, 'error'),
+          });
         }
       },
 
+      // ⚠️ نفس تصحيح shareTaskToWs بالضبط — نفس الخلل، بس بالاتجاه المعاكس
+      // (إلغاء مشاركة). كانت ما تحفظ sharedToWsIds المُحدَّث بالمستند الشخصي.
       unshareTaskFromWs: (taskId, wsId) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -246,8 +266,16 @@ export const useTasksStore = create(
           ),
         }));
 
-        if (!_disableFirestoreSyncForTesting) {
-          wsTaskService.delete(wsId, taskId).catch(console.error);
+        if (_disableFirestoreSyncForTesting) return;
+
+        wsTaskService.delete(wsId, taskId).catch(console.error);
+
+        const updated = get().tasks.find((t) => t.id === taskId);
+        const uid = useAuthStore.getState().user?.uid;
+        if (updated && uid && updated.workspaceId === null) {
+          retryFirestoreWrite(() => tasksService.update(uid, taskId, { sharedToWsIds: updated.sharedToWsIds }), {
+            onFinalFailure: () => showToast(`Couldn't update the share status for "${updated.name}" — check your connection and try again`, 'error'),
+          });
         }
       },
 
