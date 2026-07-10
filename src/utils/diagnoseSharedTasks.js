@@ -10,6 +10,8 @@
 // النتيجة تطلع كجدول (console.table) — كل صف = تاسك فيه اختلاف يستاهل مراجعة.
 
 import { useTasksStore } from '../store/tasksStore';
+import { collection, getDocs } from 'firebase/firestore';
+import { getUserScopedDb } from '../services/firebaseClient';
 import { useWorkspacesStore } from '../store/workspacesStore';
 import { useAuthStore } from '../store/authStore';
 import { wsTaskService } from '../services/wsTaskService';
@@ -155,4 +157,52 @@ export async function fixSharedTaskMismatches(dryRun = true) {
 
 if (typeof window !== 'undefined') {
   window.__priora_fixSharedTaskMismatches = fixSharedTaskMismatches;
+}
+
+// ⚠️ أداة تشخيصية إضافية بطلب عاجل — تفحص Firestore مباشرة (قراءة فقط، صفر
+// كتابة) لتاسك معيّن بالاسم (أو جزء منه)، بدون الحاجة تتنقل بواجهة Firebase
+// Console يدوياً. تعرض بالضبط هل التاسك موجود بـtasks (نشط) و/أو trash
+// (محذوف) بهذي اللحظة، بكل تفاصيله التقنية (_syncTs، _deletedAt، إلخ).
+//
+// الاستخدام: __priora_checkTask("جزء من اسم التاسك")
+export async function checkTask(nameSubstring) {
+  const uid = useAuthStore.getState().user?.uid;
+  if (!uid) {
+    console.warn('[Priora] ما فيه مستخدم مسجّل دخول.');
+    return;
+  }
+
+  const db = await getUserScopedDb();
+  const q = nameSubstring.trim().toLowerCase();
+
+  const [tasksSnap, trashSnap] = await Promise.all([
+    getDocs(collection(db, 'users', uid, 'tasks')),
+    getDocs(collection(db, 'users', uid, 'trash')),
+  ]);
+
+  const matchingTasks = tasksSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((t) => (t.name ?? '').toLowerCase().includes(q));
+  const matchingTrash = trashSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((t) => (t.name ?? '').toLowerCase().includes(q));
+
+  console.log(`[Priora] موجود بـ"tasks" (نشط) — ${matchingTasks.length} نتيجة:`);
+  console.table(matchingTasks.map((t) => ({ id: t.id, name: t.name, status: t.status, lastUpdate: t.lastUpdate, _syncTs: t._syncTs, folderId: t.folderId })));
+
+  console.log(`[Priora] موجود بـ"trash" (محذوف) — ${matchingTrash.length} نتيجة:`);
+  console.table(matchingTrash.map((t) => ({ id: t.id, name: t.name, _deletedAt: t._deletedAt, folderId: t.folderId })));
+
+  if (matchingTasks.length > 0 && matchingTrash.length > 0) {
+    const overlap = matchingTasks.filter((t) => matchingTrash.some((tr) => tr.id === t.id));
+    if (overlap.length > 0) {
+      console.warn(`[Priora] ⚠️ ${overlap.length} تاسك موجود بالمكانين بنفس اللحظة (zombie حقيقي بـFirestore الآن) — id: ${overlap.map((t) => t.id).join(', ')}`);
+    }
+  }
+
+  return { matchingTasks, matchingTrash };
+}
+
+if (typeof window !== 'undefined') {
+  window.__priora_checkTask = checkTask;
 }
