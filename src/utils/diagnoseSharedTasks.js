@@ -206,3 +206,18 @@ export async function checkTask(nameSubstring) {
 if (typeof window !== 'undefined') {
   window.__priora_checkTask = checkTask;
 }
+
+// ⚠️ أداة تشخيصية إضافية — تعرض بالضبط وش موجود بذاكرة التطبيق المحلية
+// (Zustand، بالـRAM، مو localStorage ولا Firestore) هالثانية بالذات. هذا هو
+// المصدر اللي تُبنى منه الواجهة فعلياً (كل شاشة، كل قائمة).
+export function debugLocalTasks(statusFilter) {
+  const tasks = useTasksStore.getState().tasks;
+  const filtered = statusFilter ? tasks.filter((t) => t.status === statusFilter) : tasks;
+  console.log(`[Priora] عدد التاسكات بالذاكرة المحلية الآن: ${tasks.length}${statusFilter ? ` (فلترة: ${statusFilter}) — ${filtered.length}` : ''}`);
+  console.table(filtered.map((t) => ({ id: t.id, name: t.name, status: t.status, folderId: t.folderId, lastUpdate: t.lastUpdate, _syncTs: t._syncTs })));
+  return filtered;
+}
+
+if (typeof window !== 'undefined') {
+  window.__priora_debugLocalTasks = debugLocalTasks;
+}
