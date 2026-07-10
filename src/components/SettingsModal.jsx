@@ -68,6 +68,19 @@ const SCREENSAVER_DESIGN_OPTIONS = [
       </>
     ),
   },
+  {
+    id: 'warp',
+    label: 'Warp',
+    previewBg: '#03040a',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', width: 16, height: 1.5, background: 'linear-gradient(to right, transparent, #dce8ff)', top: '30%', left: '52%', transform: 'rotate(20deg)' }} />
+        <div style={{ position: 'absolute', width: 20, height: 1.5, background: 'linear-gradient(to right, transparent, #fff)', top: '65%', left: '10%', transform: 'rotate(-15deg)' }} />
+        <div style={{ position: 'absolute', width: 14, height: 1.5, background: 'linear-gradient(to right, transparent, #fff4d9)', top: '20%', left: '8%', transform: 'rotate(200deg)' }} />
+        <div style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: 'radial-gradient(circle, #7d9bff, transparent)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      </>
+    ),
+  },
 ];
 
 const FEATURES_LIST = [

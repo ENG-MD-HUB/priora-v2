@@ -15,7 +15,6 @@
 // ScreensaverOrbit.jsx (دوائر تدور ببطء حول الشعار) — أفكار بديلة بنفس الهدوء.
 
 import { useMemo } from 'react';
-import { useUIStore } from '../store/uiStore';
 
 const STAR_COUNT = 90;
 const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff', '#ffe9d6']; // أبيض، أزرق فاتح، أصفر فاتح، أزرق سماوي فاتح، عاجي فاتح
@@ -51,7 +50,6 @@ function buildStarKeyframes() {
 }
 
 export function Screensaver({ onDismiss }) {
-  const theme = useUIStore((s) => s.theme);
   const stars = useMemo(generateStars, []);
   const starKeyframesCSS = useMemo(buildStarKeyframes, []);
 
@@ -78,7 +76,7 @@ export function Screensaver({ onDismiss }) {
 
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
         <img
-          src={theme === 'dark' ? '/logo-night.png' : '/logo-day.png'}
+          src="/logo-night.png"
           alt="Priora"
           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
         />

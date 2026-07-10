@@ -21,7 +21,7 @@ import { useState, useEffect, useRef } from 'react';
 const DEFAULT_TIMEOUT_MINUTES = 5;
 const MIN_TIMEOUT_MINUTES = 1;
 const DEFAULT_DESIGN = 'starfield';
-const VALID_DESIGNS = ['starfield', 'aurora', 'orbit'];
+const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp'];
 
 const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
 const MINUTES_STORAGE_KEY = 'priora_screensaver_minutes';

@@ -1,10 +1,15 @@
 // ScreensaverOrbit.jsx
-// تصميم بديل ثالث لشاشة التوقف — حلقات رفيعة شفافة تدور ببطء حول الشعار بالمنتصف
-// (يشبه مدارات كوكبية هادئة)، مع نجوم خلفية خفيفة. اختيار بديل بطلب صريح
-// ("شكلين إضافية") — غير مستخدم حالياً بالتطبيق إلا لو استُبدل Screensaver.jsx به.
+// تصميم بديل ثالث لشاشة التوقف — حلقات رفيعة شفافة حول الشعار بالمنتصف (يشبه
+// مدارات كوكبية هادئة)، مع نجوم خلفية خفيفة.
+//
+// ⚠️ تصحيح خلل حقيقي بطلب صريح ("الصورة ثابتة"): الحلقات كانت فعلاً تدور
+// (animation: rotate موجود ويشتغل)، لكن حلقة دائرية بسيطة متناظرة تماماً
+// **تبدو ثابتة بصرياً بغض النظر عن دورانها** — لا فرق مرئي بين 0 درجة و180 درجة
+// لخط دائري موحّد السماكة والشفافية. الحل: نضيف نقطة مضيئة صغيرة (كوكب) على
+// حافة كل حلقة، تدور معها — الحلقة نفسها تبقى (خفيفة، جمالية)، لكن حركة
+// النقطة حول المسار هي اللي تُظهر الدوران فعلياً للعين.
 
 import { useMemo } from 'react';
-import { useUIStore } from '../store/uiStore';
 
 const FAINT_STAR_COUNT = 40;
 
@@ -19,8 +24,13 @@ function generateFaintStars() {
   }));
 }
 
+const RINGS = [
+  { inset: 0, duration: 28, reverse: false, color: '#7d9bff', ringColor: 'rgba(120,160,255,.18)' },
+  { inset: 28, duration: 20, reverse: true, color: '#b28cff', ringColor: 'rgba(160,130,255,.14)' },
+  { inset: 56, duration: 34, reverse: false, color: '#5fd8e8', ringColor: 'rgba(99,200,220,.16)' },
+];
+
 export function ScreensaverOrbit({ onDismiss }) {
-  const theme = useUIStore((s) => s.theme);
   const stars = useMemo(generateFaintStars, []);
 
   return (
@@ -44,13 +54,27 @@ export function ScreensaverOrbit({ onDismiss }) {
       ))}
 
       <div style={{ position: 'relative', width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, border: '1px solid rgba(120,160,255,.18)', borderRadius: '50%', animation: 'priora-orbit-spin 28s linear infinite' }} />
-        <div style={{ position: 'absolute', inset: 28, border: '1px solid rgba(160,130,255,.14)', borderRadius: '50%', animation: 'priora-orbit-spin 20s linear infinite reverse' }} />
-        <div style={{ position: 'absolute', inset: 56, border: '1px solid rgba(99,200,220,.16)', borderRadius: '50%', animation: 'priora-orbit-spin 34s linear infinite' }} />
+        {RINGS.map((ring, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute', inset: ring.inset, border: `1px solid ${ring.ringColor}`, borderRadius: '50%',
+              animation: `priora-orbit-spin ${ring.duration}s linear infinite ${ring.reverse ? 'reverse' : ''}`,
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute', top: -3, left: '50%', width: 6, height: 6, borderRadius: '50%',
+                background: ring.color, transform: 'translateX(-50%)',
+                boxShadow: `0 0 8px 2px ${ring.color}`,
+              }}
+            />
+          </div>
+        ))}
 
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <img
-            src={theme === 'dark' ? '/logo-night.png' : '/logo-day.png'}
+            src="/logo-night.png"
             alt="Priora"
             style={{ height: 50, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
           />
