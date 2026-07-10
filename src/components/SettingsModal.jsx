@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
 import { FontScaleControl } from './FontScaleControl';
 import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
@@ -140,6 +140,7 @@ export function SettingsModal({ onClose, fontScale }) {
   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
   const [screensaverCaption, setScreensaverCaptionState] = useState(getScreensaverCaption);
+  const [screensaverBrand, setScreensaverBrandState] = useState(getScreensaverBrand);
 
   function handleToggleScreensaver(value) {
     setScreensaverEnabledState(value);
@@ -159,6 +160,11 @@ export function SettingsModal({ onClose, fontScale }) {
   function handleChangeScreensaverCaption(text) {
     setScreensaverCaptionState(text); // تحديث فوري بالحقل نفسه (بدون قص أثناء الكتابة)
     setScreensaverCaption(text); // الحفظ الفعلي (يقص للحد الأقصى) يصير بالخلفية
+  }
+
+  function handleChangeScreensaverBrand(text) {
+    setScreensaverBrandState(text);
+    setScreensaverBrand(text);
   }
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -467,6 +473,18 @@ export function SettingsModal({ onClose, fontScale }) {
                         onChange={(e) => handleChangeScreensaverCaption(e.target.value)}
                         placeholder="e.g. a quote, your name, © Company"
                         maxLength={80}
+                        className="input"
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Signature line (optional, smaller text below)</div>
+                      <input
+                        type="text"
+                        value={screensaverBrand}
+                        onChange={(e) => handleChangeScreensaverBrand(e.target.value)}
+                        placeholder="e.g. your company name or © 2026"
+                        maxLength={60}
                         className="input"
                       />
                     </div>

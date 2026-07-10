@@ -24,11 +24,14 @@ const DEFAULT_DESIGN = 'starfield';
 const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
 const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
 const MAX_CAPTION_LENGTH = 80;
+const DEFAULT_BRAND = '';
+const MAX_BRAND_LENGTH = 60;
 
 const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
 const MINUTES_STORAGE_KEY = 'priora_screensaver_minutes';
 const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
 const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
+const BRAND_STORAGE_KEY = 'priora_screensaver_brand';
 const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
 
 export function getScreensaverEnabled() {
@@ -93,12 +96,31 @@ export function setScreensaverCaption(caption) {
   return trimmed;
 }
 
+// ⚠️ إضافة جديدة بطلب صريح: سطر ثابت ثانٍ (أصغر، تحت العبارة الرئيسية) — عادة
+// اسم شركة/جهة، أو أي توقيع ثابت. منفصل عن العبارة الرئيسية عمداً (يقدر
+// المستخدم يخصّص الاثنين بشكل مستقل، أو يسيب أي وحدة فاضية).
+export function getScreensaverBrand() {
+  if (typeof localStorage === 'undefined') return DEFAULT_BRAND;
+  const stored = localStorage.getItem(BRAND_STORAGE_KEY);
+  return stored === null ? DEFAULT_BRAND : stored;
+}
+
+export function setScreensaverBrand(brand) {
+  const trimmed = (brand ?? '').trim().slice(0, MAX_BRAND_LENGTH);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(BRAND_STORAGE_KEY, trimmed);
+    window.dispatchEvent(new Event(SETTING_CHANGE_EVENT));
+  }
+  return trimmed;
+}
+
 export function useIdleScreensaver() {
   const [isActive, setIsActive] = useState(false);
   const [enabled, setEnabled] = useState(getScreensaverEnabled);
   const [minutes, setMinutes] = useState(getScreensaverMinutes);
   const [design, setDesign] = useState(getScreensaverDesign);
   const [caption, setCaption] = useState(getScreensaverCaption);
+  const [brand, setBrand] = useState(getScreensaverBrand);
   const timeoutRef = useRef(null);
   const isActiveRef = useRef(false); // مرجع فوري (بدون تأخير closure) يُستخدم داخل مستمعي الأحداث
 
@@ -111,6 +133,7 @@ export function useIdleScreensaver() {
       setMinutes(getScreensaverMinutes());
       setDesign(getScreensaverDesign());
       setCaption(getScreensaverCaption());
+      setBrand(getScreensaverBrand());
     }
     window.addEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
@@ -162,5 +185,5 @@ export function useIdleScreensaver() {
     resetTimer();
   }
 
-  return { isActive, enabled, minutes, design, caption, toggleEnabled, dismiss };
+  return { isActive, enabled, minutes, design, caption, brand, toggleEnabled, dismiss };
 }

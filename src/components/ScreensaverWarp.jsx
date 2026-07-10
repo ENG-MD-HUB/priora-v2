@@ -35,7 +35,7 @@ function generateWarpStars() {
   }));
 }
 
-export function ScreensaverWarp({ onDismiss, caption }) {
+export function ScreensaverWarp({ onDismiss, caption, brand }) {
   const stars = useMemo(generateWarpStars, []);
 
   return (
@@ -56,7 +56,7 @@ export function ScreensaverWarp({ onDismiss, caption }) {
                 width: s.size, height: s.size, borderRadius: '50%',
                 background: s.color,
                 boxShadow: `0 0 ${s.size * 1.8}px ${s.color}`,
-                animation: `priora-warp-drift-${Math.round(s.finalOpacity * 100)} ${s.duration}s linear ${s.delay}s infinite`,
+                animation: `priora-warp-drift-${Math.round(s.finalOpacity * 100)} ${s.duration}s cubic-bezier(.3,.05,.9,1) ${s.delay}s infinite`,
               }}
             />
           </div>
@@ -74,23 +74,37 @@ export function ScreensaverWarp({ onDismiss, caption }) {
         </p>
       </div>
 
-      {caption && (
-        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
-          {caption}
-        </p>
+      {(caption || brand) && (
+        <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
+          {caption && (
+            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+              {caption}
+            </p>
+          )}
+          {brand && (
+            <p style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,.28)', letterSpacing: '.14em', textTransform: 'uppercase', margin: '7px 0 0' }}>
+              {brand}
+            </p>
+          )}
+        </div>
       )}
 
       <style>{`
         /* ⚠️ توليد 56 قاعدة @keyframes ثابتة (مستوى سطوع نهائي لكل 1% من 40 لـ95)
            بدل قراءة متغيّر CSS مخصّص داخل keyframes (دعم غير موحّد بالمتصفحات) —
-           كل نجم يختار القاعدة المطابقة لسطوعه النهائي المحسوب مسبقاً بـJavaScript. */
+           كل نجم يختار القاعدة المطابقة لسطوعه النهائي المحسوب مسبقاً بـJavaScript.
+           ⚠️ تصحيح إضافي بطلب صريح: نمو الحجم كان خفيف جداً (scale .5→1.2)، ما
+           يعطي إحساس "اقتراب" واضح — الآن نمو أوضح بكثير (scale .35→2.4)، مع
+           منحنى تسارع (ease-in — بطيء بالبداية، أسرع بالنهاية) بدل خطي، يحاكي
+           الإحساس الحقيقي لجسم يقترب منك بالفضاء (كل ما قرب، زادت سرعته الظاهرية). */
         ${Array.from({ length: 56 }, (_, i) => {
           const op = (40 + i) / 100;
           return `@keyframes priora-warp-drift-${40 + i} {
-            0% { transform: translateX(0) scale(.5); opacity: 0; }
-            8% { opacity: ${op}; }
+            0% { transform: translateX(0) scale(.35); opacity: 0; }
+            8% { opacity: ${op * 0.6}; }
+            60% { opacity: ${op}; }
             92% { opacity: ${op}; }
-            100% { transform: translateX(${MAX_TRAVEL}px) scale(1.2); opacity: 0; }
+            100% { transform: translateX(${MAX_TRAVEL}px) scale(2.4); opacity: 0; }
           }`;
         }).join('\n')}
         @keyframes priora-logo-glow {

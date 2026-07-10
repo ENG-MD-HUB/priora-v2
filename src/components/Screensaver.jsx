@@ -63,7 +63,7 @@ function buildStarKeyframes() {
     `).join('\n');
 }
 
-export function Screensaver({ onDismiss, caption }) {
+export function Screensaver({ onDismiss, caption, brand }) {
   const stars = useMemo(generateStars, []);
   const starKeyframesCSS = useMemo(buildStarKeyframes, []);
 
@@ -99,10 +99,19 @@ export function Screensaver({ onDismiss, caption }) {
         </p>
       </div>
 
-      {caption && (
-        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
-          {caption}
-        </p>
+      {(caption || brand) && (
+        <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px' }}>
+          {caption && (
+            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+              {caption}
+            </p>
+          )}
+          {brand && (
+            <p style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,.28)', letterSpacing: '.14em', textTransform: 'uppercase', margin: '7px 0 0' }}>
+              {brand}
+            </p>
+          )}
+        </div>
       )}
 
       <style>{`

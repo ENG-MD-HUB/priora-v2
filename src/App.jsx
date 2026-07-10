@@ -180,7 +180,7 @@ function AuthenticatedApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 0 }}>
-      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} caption={screensaver.caption} />}
+      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} caption={screensaver.caption} brand={screensaver.brand} />}
       <TopBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Sidebar fontScale={fontScale} />
