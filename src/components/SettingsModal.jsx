@@ -95,17 +95,6 @@ const SCREENSAVER_DESIGN_OPTIONS = [
       </>
     ),
   },
-  {
-    id: 'synthwave',
-    label: 'Synthwave',
-    previewBg: 'linear-gradient(to bottom, #170a3a 0%, #7a1f5e 60%, #2a0a3d 100%)',
-    previewElement: (
-      <>
-        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(180deg,#ffe28a,#ff7a8a,#a730c9)' }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,120,220,.7) 0, rgba(255,120,220,.7) 1px, transparent 1px, transparent 6px)' }} />
-      </>
-    ),
-  },
 ];
 
 const FEATURES_LIST = [
