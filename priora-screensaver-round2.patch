@@ -1,0 +1,580 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index b4c9544..a50104c 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -34,6 +34,7 @@ import { Screensaver } from './components/Screensaver';
+ import { ScreensaverAurora } from './components/ScreensaverAurora';
+ import { ScreensaverOrbit } from './components/ScreensaverOrbit';
+ import { ScreensaverWarp } from './components/ScreensaverWarp';
++import { ScreensaverGalaxy } from './components/ScreensaverGalaxy';
+ import { shouldMigrateFoldersToSubfolders, runFoldersToSubfoldersMigration, markFoldersMigrated } from './utils/migrateFoldersToSubfolders';
+ import { LoginScreen } from './components/LoginScreen';
+ import { LoadingScreen } from './components/LoadingScreen';
+@@ -51,7 +52,7 @@ import { GlobalSearchPage } from './components/GlobalSearchPage';
+ // أسماء الصفحات اللي لها محتوى خاص بها دائماً (مش خاضعة لاستبدال نتائج البحث
+ // الشامل) — نسخة من المتغير Bt بالكود الأصلي.
+ const VIEWS_WITH_OWN_CONTENT = ['dashboard', 'completed', 'trash', 'contacts', 'workspaces'];
+-const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit, warp: ScreensaverWarp };
++const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit, warp: ScreensaverWarp, galaxy: ScreensaverGalaxy };
+ 
+ function AuthenticatedApp() {
+   const activeView = useUIStore((s) => s.activeView);
+@@ -181,7 +182,7 @@ function AuthenticatedApp() {
+ 
+   return (
+     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 0 }}>
+-      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} />}
++      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} caption={screensaver.caption} />}
+       <TopBar />
+       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+         <Sidebar fontScale={fontScale} />
+diff --git a/src/components/Screensaver.jsx b/src/components/Screensaver.jsx
+index 6deb719..391c6bd 100644
+--- a/src/components/Screensaver.jsx
++++ b/src/components/Screensaver.jsx
+@@ -17,7 +17,21 @@
+ import { useMemo } from 'react';
+ 
+ const STAR_COUNT = 90;
+-const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff', '#ffe9d6']; // أبيض، أزرق فاتح، أصفر فاتح، أزرق سماوي فاتح، عاجي فاتح
++// ⚠️ تصحيح بطلب صريح: أضفت نجوم برتقالية وموف نادرة (زي النجوم الحقيقية —
++// أغلب النجوم بيضاء/زرقاء فاتحة، وقلة قليلة عملاقة حمراء/برتقالية أو نادرة
++// جداً بنفسجية). الألوان الشائعة مكررة أكثر بالمصفوفة عمداً (توزيع احتمالي
++// موزون) عشان الألوان النادرة تضل نادرة فعلاً، مو نص النجوم.
++const STAR_COLORS = [
++  '#ffffff', '#ffffff', '#ffffff', // أبيض — الأكثر شيوعاً
++  '#dce8ff', '#dce8ff', '#cfe3ff', // أزرق فاتح/سماوي — شائع
++  '#fff4d9', '#ffe9d6', // أصفر/عاجي فاتح — شائع
++  '#ffb87a', // برتقالي (نجم عملاق نادر) — نادر
++  '#c9a8ff', // موف خفيف (نادر جداً، لمسة فنية) — نادر جداً
++];
++
++// ⚠️ تصحيح بطلب صريح: مدى السرعة كان 1.5-6.5 ثانية بس (كل النجوم تقريباً بنفس
++// النطاق السريع). الآن مدى أوسع بكثير (1.5-10.5 ثانية) — بعض النجوم توضح تومض
++// ببطء شديد وهادئ، وبعضها يضل أسرع نسبياً، بتباين واقعي أكبر.
+ 
+ const OPACITY_LEVELS = [0.45, 0.6, 0.75, 0.85, 0.95]; // 5 مستويات سطوع ثابتة (تنوّع كافٍ بصرياً، بدون توليد مئات قواعد @keyframes منفصلة)
+ 
+@@ -27,8 +41,8 @@ function generateStars() {
+     left: Math.random() * 100,
+     top: Math.random() * 100,
+     size: Math.random() * 2.6 + 0.8, // تنوّع أوضح بالحجم (0.8 إلى 3.4px)
+-    duration: Math.random() * 5 + 1.5, // تنوّع أوضح بالسرعة (1.5 إلى 6.5 ثانية)
+-    delay: Math.random() * 5,
++    duration: Math.random() * 9 + 1.5, // تنوّع أوسع بالسرعة (1.5 إلى 10.5 ثانية)
++    delay: Math.random() * 8,
+     color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+     pattern: i % 4,
+     opacityLevel: i % OPACITY_LEVELS.length,
+@@ -49,7 +63,7 @@ function buildStarKeyframes() {
+     `).join('\n');
+ }
+ 
+-export function Screensaver({ onDismiss }) {
++export function Screensaver({ onDismiss, caption }) {
+   const stars = useMemo(generateStars, []);
+   const starKeyframesCSS = useMemo(buildStarKeyframes, []);
+ 
+@@ -81,10 +95,16 @@ export function Screensaver({ onDismiss }) {
+           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
+         />
+         <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+-          Move or click to continue
++          Click to continue
+         </p>
+       </div>
+ 
++      {caption && (
++        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
++          {caption}
++        </p>
++      )}
++
+       <style>{`
+         ${starKeyframesCSS}
+         @keyframes priora-logo-glow {
+diff --git a/src/components/ScreensaverAurora.jsx b/src/components/ScreensaverAurora.jsx
+index 28bc9bb..9c5406e 100644
+--- a/src/components/ScreensaverAurora.jsx
++++ b/src/components/ScreensaverAurora.jsx
+@@ -2,15 +2,14 @@
+ // تصميم بديل لشاشة التوقف — موج ضوئي هادئ متدرّج الألوان (يشبه الشفق القطبي
+ // Aurora) يتحرك ببطء بالخلفية، والشعار بالمنتصف بنفس وميض التوهج.
+ //
+-// ⚠️ تصحيح خلل حقيقي بطلب صريح: الكتل كانت تتحرك بالموضع فقط (translate/scale)،
+-// لكن ألوانها نفسها (أزرق، بنفسجي، فيروزي) كانت ثابتة تماماً طول الوقت — نفس
+-// الدرجة من البداية للنهاية، بدون أي تغيّر لوني حقيقي. إضافة hue-rotate متحرك
+-// (الطريقة الموثوقة لتحريك ألوان تدرّج بكل المتصفحات — تحريك خاصية background
+-// نفسها بـkeyframes غير مدعوم بثبات) لكل كتلة لحالها بسرعة مختلفة، فتتحول
+-// الألوان فعلياً بمرور الوقت (أزرق يميل بنفسجي، بنفسجي يميل فيروزي، وهكذا) —
+-// بدل موضع متحرك بلون جامد.
++// ⚠️ تصحيح بطلب صريح (تراجع + تحسين): محاولة سابقة غيّرت الألوان نفسها بمرور
++// الوقت (hue-rotate) — لم تعجب المستخدم، يبيها ترجع لألوانها الأساسية الثابتة
++// (أزرق/بنفسجي/فيروزي كما كانت أصلاً) بس الحركة نفسها تصير عشوائية وغير منتظمة
++// أكتر (مسار متعدد النقاط بدل ذهاب-إياب متماثل بسيط)، والشكل نفسه غير منتظم
++// (border-radius متحرك بنسب غير متساوية — تأثير "blob" عضوي، بدل دائرة مثالية
++// ثابتة الشكل تكبر/تصغر فقط).
+ 
+-export function ScreensaverAurora({ onDismiss }) {
++export function ScreensaverAurora({ onDismiss, caption }) {
+ 
+   return (
+     <div
+@@ -22,9 +21,9 @@ export function ScreensaverAurora({ onDismiss }) {
+       }}
+     >
+       <div style={{ position: 'absolute', inset: '-20%', filter: 'blur(60px)', opacity: .35 }}>
+-        <div style={{ position: 'absolute', width: '60%', height: '60%', left: '5%', top: '10%', borderRadius: '50%', background: 'radial-gradient(circle, #4f7cff, transparent 70%)', animation: 'priora-aurora-drift-1 18s ease-in-out infinite, priora-aurora-hue-1 24s linear infinite' }} />
+-        <div style={{ position: 'absolute', width: '50%', height: '50%', left: '45%', top: '40%', borderRadius: '50%', background: 'radial-gradient(circle, #7d5fff, transparent 70%)', animation: 'priora-aurora-drift-2 22s ease-in-out infinite, priora-aurora-hue-2 32s linear infinite reverse' }} />
+-        <div style={{ position: 'absolute', width: '45%', height: '45%', left: '20%', top: '55%', borderRadius: '50%', background: 'radial-gradient(circle, #2fd4c9, transparent 70%)', animation: 'priora-aurora-drift-3 26s ease-in-out infinite, priora-aurora-hue-3 28s linear infinite' }} />
++        <div style={{ position: 'absolute', width: '60%', height: '60%', left: '5%', top: '10%', background: 'radial-gradient(circle, #4f7cff, transparent 70%)', animation: 'priora-aurora-drift-1 27s ease-in-out infinite' }} />
++        <div style={{ position: 'absolute', width: '50%', height: '50%', left: '45%', top: '40%', background: 'radial-gradient(circle, #7d5fff, transparent 70%)', animation: 'priora-aurora-drift-2 33s ease-in-out infinite' }} />
++        <div style={{ position: 'absolute', width: '45%', height: '45%', left: '20%', top: '55%', background: 'radial-gradient(circle, #2fd4c9, transparent 70%)', animation: 'priora-aurora-drift-3 39s ease-in-out infinite' }} />
+       </div>
+ 
+       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+@@ -34,17 +33,45 @@ export function ScreensaverAurora({ onDismiss }) {
+           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
+         />
+         <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+-          Move or click to continue
++          Click to continue
+         </p>
+       </div>
+ 
++      {caption && (
++        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
++          {caption}
++        </p>
++      )}
++
+       <style>{`
+-        @keyframes priora-aurora-drift-1 { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(8%,5%) scale(1.15); } }
+-        @keyframes priora-aurora-drift-2 { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-10%,8%) scale(1.1); } }
+-        @keyframes priora-aurora-drift-3 { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(6%,-8%) scale(1.2); } }
+-        @keyframes priora-aurora-hue-1 { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+-        @keyframes priora-aurora-hue-2 { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+-        @keyframes priora-aurora-hue-3 { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
++        /* ⚠️ مسارات غير منتظمة عمداً — نقاط توقف بنسب مختلفة (0/22/41/63/85/100
++           مو 0/50/100 المتماثلة)، وكل نقطة توقف لها إزاحة واتجاه وحجم وشكل مختلف
++           تماماً عن الثانية (border-radius غير متساوي الأركان بكل خطوة) — يعطي
++           إحساس حركة عضوية عشوائية حقيقية، بدل تذبذب آلي متكرر بنمط واحد. */
++        @keyframes priora-aurora-drift-1 {
++          0%   { transform: translate(0,0) scale(1); border-radius: 42% 58% 65% 35%/45% 40% 60% 55%; }
++          22%  { transform: translate(9%,4%) scale(1.12); border-radius: 60% 40% 30% 70%/50% 65% 35% 50%; }
++          41%  { transform: translate(4%,11%) scale(0.94); border-radius: 35% 65% 55% 45%/60% 30% 70% 40%; }
++          63%  { transform: translate(-7%,6%) scale(1.08); border-radius: 55% 45% 40% 60%/35% 55% 45% 65%; }
++          85%  { transform: translate(-3%,-5%) scale(0.97); border-radius: 48% 52% 60% 40%/55% 45% 50% 50%; }
++          100% { transform: translate(0,0) scale(1); border-radius: 42% 58% 65% 35%/45% 40% 60% 55%; }
++        }
++        @keyframes priora-aurora-drift-2 {
++          0%   { transform: translate(0,0) scale(1); border-radius: 50% 50% 40% 60%/60% 45% 55% 40%; }
++          18%  { transform: translate(-10%,7%) scale(1.15); border-radius: 65% 35% 55% 45%/40% 60% 35% 65%; }
++          44%  { transform: translate(-4%,-8%) scale(0.9); border-radius: 38% 62% 45% 55%/55% 35% 65% 40%; }
++          70%  { transform: translate(8%,3%) scale(1.1); border-radius: 58% 42% 60% 40%/45% 55% 40% 60%; }
++          88%  { transform: translate(3%,9%) scale(0.95); border-radius: 45% 55% 50% 50%/50% 40% 55% 50%; }
++          100% { transform: translate(0,0) scale(1); border-radius: 50% 50% 40% 60%/60% 45% 55% 40%; }
++        }
++        @keyframes priora-aurora-drift-3 {
++          0%   { transform: translate(0,0) scale(1); border-radius: 55% 45% 50% 50%/40% 55% 45% 60%; }
++          26%  { transform: translate(6%,-9%) scale(1.18); border-radius: 40% 60% 65% 35%/60% 40% 55% 45%; }
++          48%  { transform: translate(-9%,-3%) scale(0.92); border-radius: 62% 38% 40% 60%/45% 60% 35% 55%; }
++          67%  { transform: translate(-2%,8%) scale(1.05); border-radius: 48% 52% 55% 45%/55% 45% 60% 40%; }
++          90%  { transform: translate(5%,2%) scale(0.98); border-radius: 50% 50% 45% 55%/50% 50% 45% 55%; }
++          100% { transform: translate(0,0) scale(1); border-radius: 55% 45% 50% 50%/40% 55% 45% 60%; }
++        }
+         @keyframes priora-logo-glow {
+           0%, 100% { filter: drop-shadow(0 0 6px rgba(99,140,255,.25)) brightness(.92); }
+           50% { filter: drop-shadow(0 0 28px rgba(120,160,255,.75)) brightness(1.15); }
+diff --git a/src/components/ScreensaverGalaxy.jsx b/src/components/ScreensaverGalaxy.jsx
+new file mode 100644
+index 0000000..f3aab2e
+--- /dev/null
++++ b/src/components/ScreensaverGalaxy.jsx
+@@ -0,0 +1,104 @@
++// ScreensaverGalaxy.jsx
++// ⚠️ تصميم جديد كلياً بطلب صريح ("شكل مميز يبهر المستخدمين"): مجرة حلزونية
++// دوّارة — أذرع من النجوم ملتفة حول مركز متوهج، تدور المجرة كاملة ببطء شديد
++// كوحدة واحدة، والشعار بمنتصف التوهج. تصميم مختلف كلياً عن الأربعة السابقة —
++// مو نقاط عشوائية ولا كتل ضبابية ولا حلقات، مجرة حقيقية الشكل.
++//
++// طريقة البناء: كل نجم له زاوية + مسافة عن المركز محسوبة رياضياً على مسار
++// حلزوني (Archimedean-ish spiral) لكل ذراع من 4 أذرع، مع اهتزاز عشوائي بسيط
++// لطبيعية أكثر. كل النجوم بداخل حاوية واحدة تدور كوحدة واحدة (100 ثانية للدورة
++// الكاملة) — بطيء جداً وهادئ. كل نجم يومض لحاله (opacity بس، ما يصادم دوران
++// الحاوية لأنه خاصية مختلفة تماماً عن transform).
++
++import { useMemo } from 'react';
++
++const ARM_COUNT = 4;
++const STARS_PER_ARM = 42;
++const SPIRAL_TWIST_DEG = 250;
++const MAX_RADIUS = 230;
++const STAR_COLORS = ['#ffffff', '#dce8ff', '#c9a8ff', '#fff4d9', '#cfe3ff'];
++
++function generateGalaxyStars() {
++  const stars = [];
++  for (let arm = 0; arm < ARM_COUNT; arm++) {
++    const baseAngle = (360 / ARM_COUNT) * arm;
++    for (let i = 0; i < STARS_PER_ARM; i++) {
++      const t = i / STARS_PER_ARM + Math.random() * 0.035;
++      const angle = baseAngle + t * SPIRAL_TWIST_DEG + (Math.random() - 0.5) * 16;
++      const radius = t * MAX_RADIUS + (Math.random() - 0.5) * 12;
++      stars.push({
++        id: `${arm}-${i}`,
++        angle,
++        radius: Math.max(radius, 6),
++        size: Math.random() * 1.9 + 0.6,
++        duration: Math.random() * 4 + 2.5,
++        delay: Math.random() * 5,
++        color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
++      });
++    }
++  }
++  return stars;
++}
++
++export function ScreensaverGalaxy({ onDismiss, caption }) {
++  const stars = useMemo(generateGalaxyStars, []);
++
++  return (
++    <div
++      onClick={onDismiss}
++      style={{
++        position: 'fixed', inset: 0, zIndex: 99999, background: '#020308',
++        display: 'flex', alignItems: 'center', justifyContent: 'center',
++        cursor: 'pointer', overflow: 'hidden', animation: 'fade-in .6s ease',
++      }}
++    >
++      <div style={{ position: 'relative', width: 560, height: 560, maxWidth: '90vw', maxHeight: '90vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
++        {/* توهج المركز */}
++        <div style={{ position: 'absolute', width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,170,255,.5), transparent 70%)', filter: 'blur(18px)', animation: 'priora-galaxy-pulse 5s ease-in-out infinite' }} />
++
++        {/* المجرة الدوّارة (كل النجوم تدور مع بعض كوحدة واحدة) */}
++        <div style={{ position: 'absolute', inset: 0, animation: 'priora-galaxy-spin 100s linear infinite' }}>
++          {stars.map((s) => (
++            <div
++              key={s.id}
++              style={{
++                position: 'absolute', top: '50%', left: '50%', width: s.size, height: s.size, borderRadius: '50%',
++                background: s.color, boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
++                transform: `translate(-50%,-50%) rotate(${s.angle}deg) translateX(${s.radius}px)`,
++                animation: `priora-galaxy-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite`,
++              }}
++            />
++          ))}
++        </div>
++
++        {/* الشعار بالمنتصف، فوق كل شي */}
++        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, zIndex: 1 }}>
++          <img
++            src="/logo-night.png"
++            alt="Priora"
++            style={{ height: 54, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
++          />
++          <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
++            Click to continue
++          </p>
++        </div>
++      </div>
++
++      {caption && (
++        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
++          {caption}
++        </p>
++      )}
++
++      <style>{`
++        @keyframes priora-galaxy-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
++        @keyframes priora-galaxy-twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
++        @keyframes priora-galaxy-pulse { 0%, 100% { opacity: .5; transform: scale(1); } 50% { opacity: .8; transform: scale(1.15); } }
++        @keyframes priora-logo-glow {
++          0%, 100% { filter: drop-shadow(0 0 6px rgba(99,140,255,.25)) brightness(.92); }
++          50% { filter: drop-shadow(0 0 28px rgba(120,160,255,.75)) brightness(1.15); }
++        }
++      `}</style>
++    </div>
++  );
++}
+diff --git a/src/components/ScreensaverOrbit.jsx b/src/components/ScreensaverOrbit.jsx
+index 77c44b7..6f5e3a2 100644
+--- a/src/components/ScreensaverOrbit.jsx
++++ b/src/components/ScreensaverOrbit.jsx
+@@ -30,7 +30,7 @@ const RINGS = [
+   { inset: 56, duration: 34, reverse: false, color: '#5fd8e8', ringColor: 'rgba(99,200,220,.16)' },
+ ];
+ 
+-export function ScreensaverOrbit({ onDismiss }) {
++export function ScreensaverOrbit({ onDismiss, caption }) {
+   const stars = useMemo(generateFaintStars, []);
+ 
+   return (
+@@ -82,9 +82,15 @@ export function ScreensaverOrbit({ onDismiss }) {
+       </div>
+ 
+       <p style={{ position: 'absolute', bottom: '12%', fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+-        Move or click to continue
++        Click to continue
+       </p>
+ 
++      {caption && (
++        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
++          {caption}
++        </p>
++      )}
++
+       <style>{`
+         @keyframes priora-orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+         @keyframes priora-faint-twinkle { 0%, 100% { opacity: .08; } 50% { opacity: .4; } }
+diff --git a/src/components/ScreensaverWarp.jsx b/src/components/ScreensaverWarp.jsx
+index 0f0f639..8a5ae4d 100644
+--- a/src/components/ScreensaverWarp.jsx
++++ b/src/components/ScreensaverWarp.jsx
+@@ -1,36 +1,32 @@
+ // ScreensaverWarp.jsx
+-// ⚠️ تصميم جديد كلياً بطلب صريح: تصميم رابع لشاشة التوقف — نجوم تنطلق من
+-// المنتصف للخارج بشكل مستمر، تحاكي إحساس "التحرك بسرعة عبر الفضاء" (زي مؤثر
+-// الانتقال بسرعة الضوء بأفلام الخيال العلمي) — بدون أي مركبة أو شكل فعلي، بس
+-// إحساس الحركة نفسه عبر النجوم المتطايرة للخارج.
++// تصميم رابع لشاشة التوقف — نجوم عادية (نقاط، زي Starfield بالضبط) لكن تنجرف
++// ببطء شديد من المنتصف للخارج، بإحساس ناعم هادئ (مو سرعة ضوء ولا شهب) — يشبه
++// إنك تطفو ببطء وسط حقل نجوم، مو تنطلق بسرعة عبره.
+ //
+-// ملاحظة تقنية: كل نجم = حاوية خارجية ثابتة الدوران (زاوية عشوائية لكل نجم، لا
+-// تتحرك) + خط داخلي متحرك (يتحرك بس بمحور X المحلي، اللي بفضل دوران الحاوية
+-// الخارجية يصير فعلياً "للخارج بزاوية عشوائية" لكل نجم). هذا الفصل ضروري لأن
+-// CSS animation على transform تستبدل قيمة transform الثابتة بالكامل أثناء
+-// التحريك (ما تُدمَج تلقائياً) — فصل الدوران الثابت عن الحركة المتحركة بعنصرين
+-// منفصلين يتفادى هذا التعارض.
++// ⚠️ تصحيح خلل حقيقي بطلب صريح: النسخة الأولى كانت خطوط ممطوطة (streaks) بمدة
++// 2.5-5 ثانية بس — يعطي إحساس شهب/نيازك سريعة، مو نجوم هادئة. الآن: نقاط دائرية
++// عادية (بدون أي مط)، بمدة 18-32 ثانية للرحلة الكاملة من المركز للحافة —
++// حركة بطيئة جداً بالكاد تُلاحَظ إلا بعد تركيز، تماماً زي المطلوب.
+ 
+ import { useMemo } from 'react';
+ 
+-const STAR_COUNT = 160;
+-const MAX_TRAVEL = 900; // px — يكفي لتغطية أي حجم شاشة معقول
++const STAR_COUNT = 130;
++const MAX_TRAVEL = 700; // px
+ 
+-const STAR_COLORS = ['#dce8ff', '#ffffff', '#fff4d9', '#cfe3ff'];
++const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff'];
+ 
+ function generateWarpStars() {
+   return Array.from({ length: STAR_COUNT }, (_, i) => ({
+     id: i,
+     angleDeg: Math.random() * 360,
+-    duration: Math.random() * 2.5 + 2.5, // 2.5–5 ثانية لكل "رحلة" نجم واحد
+-    delay: -Math.random() * 6, // تأخير سالب = يبدأ التحريك بمنتصف الدورة فوراً، بدل ما كل النجوم "تولد" مع بعض بلحظة الفتح
+-    length: Math.random() * 30 + 14,
+-    thickness: Math.random() * 1.3 + 0.6,
++    duration: Math.random() * 14 + 18, // 18–32 ثانية: بطيء جداً وناعم
++    delay: -Math.random() * 30, // سالب = يبدأ منتصف الرحلة فوراً، بدون "ولادة" جماعية بلحظة الفتح
++    size: Math.random() * 2 + 1,
+     color: STAR_COLORS[i % STAR_COLORS.length],
+   }));
+ }
+ 
+-export function ScreensaverWarp({ onDismiss }) {
++export function ScreensaverWarp({ onDismiss, caption }) {
+   const stars = useMemo(generateWarpStars, []);
+ 
+   return (
+@@ -47,10 +43,11 @@ export function ScreensaverWarp({ onDismiss }) {
+           <div key={s.id} style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, transform: `rotate(${s.angleDeg}deg)` }}>
+             <div
+               style={{
+-                position: 'absolute', top: -s.thickness / 2, left: 0,
+-                width: s.length, height: s.thickness, borderRadius: s.thickness,
+-                background: `linear-gradient(to right, transparent, ${s.color})`,
+-                animation: `priora-warp-fly ${s.duration}s cubic-bezier(.4,0,.8,1) ${s.delay}s infinite`,
++                position: 'absolute', top: -s.size / 2, left: 0,
++                width: s.size, height: s.size, borderRadius: '50%',
++                background: s.color,
++                boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
++                animation: `priora-warp-drift ${s.duration}s linear ${s.delay}s infinite`,
+               }}
+             />
+           </div>
+@@ -64,16 +61,22 @@ export function ScreensaverWarp({ onDismiss }) {
+           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
+         />
+         <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+-          Move or click to continue
++          Click to continue
+         </p>
+       </div>
+ 
++      {caption && (
++        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
++          {caption}
++        </p>
++      )}
++
+       <style>{`
+-        @keyframes priora-warp-fly {
+-          0% { transform: translateX(0) scaleX(.3); opacity: 0; }
+-          12% { opacity: 1; }
+-          85% { opacity: 1; }
+-          100% { transform: translateX(${MAX_TRAVEL}px) scaleX(1); opacity: 0; }
++        @keyframes priora-warp-drift {
++          0% { transform: translateX(0) scale(.4); opacity: 0; }
++          10% { opacity: 1; }
++          90% { opacity: 1; }
++          100% { transform: translateX(${MAX_TRAVEL}px) scale(1.3); opacity: 0; }
+         }
+         @keyframes priora-logo-glow {
+           0%, 100% { filter: drop-shadow(0 0 6px rgba(99,140,255,.25)) brightness(.92); }
+@@ -83,3 +86,4 @@ export function ScreensaverWarp({ onDismiss }) {
+     </div>
+   );
+ }
++
+diff --git a/src/components/SettingsModal.jsx b/src/components/SettingsModal.jsx
+index 989416b..278d4e7 100644
+--- a/src/components/SettingsModal.jsx
++++ b/src/components/SettingsModal.jsx
+@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
+ import { contactsService } from '../services/contactsService';
+ import { showToast } from '../store/toastStore';
+ import { APP_VERSION } from '../utils/appConstants';
+-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
++import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption } from '../utils/useIdleScreensaver';
+ import { FontScaleControl } from './FontScaleControl';
+ import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
+ 
+@@ -81,6 +81,21 @@ const SCREENSAVER_DESIGN_OPTIONS = [
+       </>
+     ),
+   },
++  {
++    id: 'galaxy',
++    label: 'Galaxy',
++    previewBg: '#020308',
++    previewElement: (
++      <>
++        <div style={{ position: 'absolute', width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,170,255,.6), transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', filter: 'blur(2px)' }} />
++        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 8, left: 14 }} />
++        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#c9a8ff', top: 26, left: 8 }} />
++        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#dce8ff', top: 12, left: 30 }} />
++        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 28, left: 26 }} />
++        <div style={{ position: 'absolute', width: 5, height: 5, borderRadius: '50%', background: '#fff', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
++      </>
++    ),
++  },
+ ];
+ 
+ const FEATURES_LIST = [
+@@ -124,6 +139,7 @@ export function SettingsModal({ onClose, fontScale }) {
+   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
+   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
+   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
++  const [screensaverCaption, setScreensaverCaptionState] = useState(getScreensaverCaption);
+ 
+   function handleToggleScreensaver(value) {
+     setScreensaverEnabledState(value);
+@@ -139,6 +155,11 @@ export function SettingsModal({ onClose, fontScale }) {
+     const safe = setScreensaverDesign(design);
+     setScreensaverDesignState(safe);
+   }
++
++  function handleChangeScreensaverCaption(text) {
++    setScreensaverCaptionState(text); // تحديث فوري بالحقل نفسه (بدون قص أثناء الكتابة)
++    setScreensaverCaption(text); // الحفظ الفعلي (يقص للحد الأقصى) يصير بالخلفية
++  }
+   const [savingProfile, setSavingProfile] = useState(false);
+   const [restoring, setRestoring] = useState(false);
+   const fileInputRef = useRef(null);
+@@ -437,6 +458,18 @@ export function SettingsModal({ onClose, fontScale }) {
+                         ))}
+                       </div>
+                     </div>
++
++                    <div style={{ marginTop: 14 }}>
++                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Bottom caption (optional)</div>
++                      <input
++                        type="text"
++                        value={screensaverCaption}
++                        onChange={(e) => handleChangeScreensaverCaption(e.target.value)}
++                        placeholder="e.g. a quote, your name, © Company"
++                        maxLength={80}
++                        className="input"
++                      />
++                    </div>
+                   </>
+                 )}
+               </div>
+diff --git a/src/utils/useIdleScreensaver.js b/src/utils/useIdleScreensaver.js
+index 4831e7f..a672067 100644
+--- a/src/utils/useIdleScreensaver.js
++++ b/src/utils/useIdleScreensaver.js
+@@ -21,11 +21,14 @@ import { useState, useEffect, useRef } from 'react';
+ const DEFAULT_TIMEOUT_MINUTES = 5;
+ const MIN_TIMEOUT_MINUTES = 1;
+ const DEFAULT_DESIGN = 'starfield';
+-const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp'];
++const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
++const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
++const MAX_CAPTION_LENGTH = 80;
+ 
+ const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
+ const MINUTES_STORAGE_KEY = 'priora_screensaver_minutes';
+ const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
++const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
+ const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
+ 
+ export function getScreensaverEnabled() {
+@@ -71,22 +74,43 @@ export function setScreensaverDesign(design) {
+   return safeDesign;
+ }
+ 
++// ⚠️ إضافة جديدة بطلب صريح: عبارة قابلة للتخصيص تظهر أسفل شاشة التوقف (زي
++// حقوق النشر، اسم المصمم، أو أي نص آخر يختاره المستخدم) — بدل نص "Click to
++// continue" الوظيفي بس. افتراضياً شعار التطبيق نفسه (APP_TAGLINE)، قابل
++// للتعديل من الإعدادات، محفوظ بـlocalStorage مستقل.
++export function getScreensaverCaption() {
++  if (typeof localStorage === 'undefined') return DEFAULT_CAPTION;
++  const stored = localStorage.getItem(CAPTION_STORAGE_KEY);
++  return stored === null ? DEFAULT_CAPTION : stored;
++}
++
++export function setScreensaverCaption(caption) {
++  const trimmed = (caption ?? '').trim().slice(0, MAX_CAPTION_LENGTH);
++  if (typeof localStorage !== 'undefined') {
++    localStorage.setItem(CAPTION_STORAGE_KEY, trimmed);
++    window.dispatchEvent(new Event(SETTING_CHANGE_EVENT));
++  }
++  return trimmed;
++}
++
+ export function useIdleScreensaver() {
+   const [isActive, setIsActive] = useState(false);
+   const [enabled, setEnabled] = useState(getScreensaverEnabled);
+   const [minutes, setMinutes] = useState(getScreensaverMinutes);
+   const [design, setDesign] = useState(getScreensaverDesign);
++  const [caption, setCaption] = useState(getScreensaverCaption);
+   const timeoutRef = useRef(null);
+   const isActiveRef = useRef(false); // مرجع فوري (بدون تأخير closure) يُستخدم داخل مستمعي الأحداث
+ 
+   // يستمع لتغيير الإعداد من SettingsModal (مودال منفصل، حالة محلية مستقلة) —
+-  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم) لا ينعكس على هذا
+-  // الـhook النشط إلا بعد تحديث الصفحة كاملة.
++  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم، العبارة) لا
++  // ينعكس على هذا الـhook النشط إلا بعد تحديث الصفحة كاملة.
+   useEffect(() => {
+     function handleSettingChange() {
+       setEnabled(getScreensaverEnabled());
+       setMinutes(getScreensaverMinutes());
+       setDesign(getScreensaverDesign());
++      setCaption(getScreensaverCaption());
+     }
+     window.addEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
+     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
+@@ -138,5 +162,5 @@ export function useIdleScreensaver() {
+     resetTimer();
+   }
+ 
+-  return { isActive, enabled, minutes, design, toggleEnabled, dismiss };
++  return { isActive, enabled, minutes, design, caption, toggleEnabled, dismiss };
+ }

@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption } from '../utils/useIdleScreensaver';
 import { FontScaleControl } from './FontScaleControl';
 import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
@@ -81,6 +81,21 @@ const SCREENSAVER_DESIGN_OPTIONS = [
       </>
     ),
   },
+  {
+    id: 'galaxy',
+    label: 'Galaxy',
+    previewBg: '#020308',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,170,255,.6), transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', filter: 'blur(2px)' }} />
+        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 8, left: 14 }} />
+        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#c9a8ff', top: 26, left: 8 }} />
+        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#dce8ff', top: 12, left: 30 }} />
+        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 28, left: 26 }} />
+        <div style={{ position: 'absolute', width: 5, height: 5, borderRadius: '50%', background: '#fff', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      </>
+    ),
+  },
 ];
 
 const FEATURES_LIST = [
@@ -124,6 +139,7 @@ export function SettingsModal({ onClose, fontScale }) {
   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
+  const [screensaverCaption, setScreensaverCaptionState] = useState(getScreensaverCaption);
 
   function handleToggleScreensaver(value) {
     setScreensaverEnabledState(value);
@@ -138,6 +154,11 @@ export function SettingsModal({ onClose, fontScale }) {
   function handleChangeScreensaverDesign(design) {
     const safe = setScreensaverDesign(design);
     setScreensaverDesignState(safe);
+  }
+
+  function handleChangeScreensaverCaption(text) {
+    setScreensaverCaptionState(text); // تحديث فوري بالحقل نفسه (بدون قص أثناء الكتابة)
+    setScreensaverCaption(text); // الحفظ الفعلي (يقص للحد الأقصى) يصير بالخلفية
   }
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -436,6 +457,18 @@ export function SettingsModal({ onClose, fontScale }) {
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Bottom caption (optional)</div>
+                      <input
+                        type="text"
+                        value={screensaverCaption}
+                        onChange={(e) => handleChangeScreensaverCaption(e.target.value)}
+                        placeholder="e.g. a quote, your name, © Company"
+                        maxLength={80}
+                        className="input"
+                      />
                     </div>
                   </>
                 )}

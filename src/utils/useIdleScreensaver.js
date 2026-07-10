@@ -21,11 +21,14 @@ import { useState, useEffect, useRef } from 'react';
 const DEFAULT_TIMEOUT_MINUTES = 5;
 const MIN_TIMEOUT_MINUTES = 1;
 const DEFAULT_DESIGN = 'starfield';
-const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp'];
+const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
+const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
+const MAX_CAPTION_LENGTH = 80;
 
 const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
 const MINUTES_STORAGE_KEY = 'priora_screensaver_minutes';
 const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
+const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
 const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
 
 export function getScreensaverEnabled() {
@@ -71,22 +74,43 @@ export function setScreensaverDesign(design) {
   return safeDesign;
 }
 
+// ⚠️ إضافة جديدة بطلب صريح: عبارة قابلة للتخصيص تظهر أسفل شاشة التوقف (زي
+// حقوق النشر، اسم المصمم، أو أي نص آخر يختاره المستخدم) — بدل نص "Click to
+// continue" الوظيفي بس. افتراضياً شعار التطبيق نفسه (APP_TAGLINE)، قابل
+// للتعديل من الإعدادات، محفوظ بـlocalStorage مستقل.
+export function getScreensaverCaption() {
+  if (typeof localStorage === 'undefined') return DEFAULT_CAPTION;
+  const stored = localStorage.getItem(CAPTION_STORAGE_KEY);
+  return stored === null ? DEFAULT_CAPTION : stored;
+}
+
+export function setScreensaverCaption(caption) {
+  const trimmed = (caption ?? '').trim().slice(0, MAX_CAPTION_LENGTH);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(CAPTION_STORAGE_KEY, trimmed);
+    window.dispatchEvent(new Event(SETTING_CHANGE_EVENT));
+  }
+  return trimmed;
+}
+
 export function useIdleScreensaver() {
   const [isActive, setIsActive] = useState(false);
   const [enabled, setEnabled] = useState(getScreensaverEnabled);
   const [minutes, setMinutes] = useState(getScreensaverMinutes);
   const [design, setDesign] = useState(getScreensaverDesign);
+  const [caption, setCaption] = useState(getScreensaverCaption);
   const timeoutRef = useRef(null);
   const isActiveRef = useRef(false); // مرجع فوري (بدون تأخير closure) يُستخدم داخل مستمعي الأحداث
 
   // يستمع لتغيير الإعداد من SettingsModal (مودال منفصل، حالة محلية مستقلة) —
-  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم) لا ينعكس على هذا
-  // الـhook النشط إلا بعد تحديث الصفحة كاملة.
+  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم، العبارة) لا
+  // ينعكس على هذا الـhook النشط إلا بعد تحديث الصفحة كاملة.
   useEffect(() => {
     function handleSettingChange() {
       setEnabled(getScreensaverEnabled());
       setMinutes(getScreensaverMinutes());
       setDesign(getScreensaverDesign());
+      setCaption(getScreensaverCaption());
     }
     window.addEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
@@ -138,5 +162,5 @@ export function useIdleScreensaver() {
     resetTimer();
   }
 
-  return { isActive, enabled, minutes, design, toggleEnabled, dismiss };
+  return { isActive, enabled, minutes, design, caption, toggleEnabled, dismiss };
 }

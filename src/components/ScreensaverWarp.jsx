@@ -1,36 +1,32 @@
 // ScreensaverWarp.jsx
-// ⚠️ تصميم جديد كلياً بطلب صريح: تصميم رابع لشاشة التوقف — نجوم تنطلق من
-// المنتصف للخارج بشكل مستمر، تحاكي إحساس "التحرك بسرعة عبر الفضاء" (زي مؤثر
-// الانتقال بسرعة الضوء بأفلام الخيال العلمي) — بدون أي مركبة أو شكل فعلي، بس
-// إحساس الحركة نفسه عبر النجوم المتطايرة للخارج.
+// تصميم رابع لشاشة التوقف — نجوم عادية (نقاط، زي Starfield بالضبط) لكن تنجرف
+// ببطء شديد من المنتصف للخارج، بإحساس ناعم هادئ (مو سرعة ضوء ولا شهب) — يشبه
+// إنك تطفو ببطء وسط حقل نجوم، مو تنطلق بسرعة عبره.
 //
-// ملاحظة تقنية: كل نجم = حاوية خارجية ثابتة الدوران (زاوية عشوائية لكل نجم، لا
-// تتحرك) + خط داخلي متحرك (يتحرك بس بمحور X المحلي، اللي بفضل دوران الحاوية
-// الخارجية يصير فعلياً "للخارج بزاوية عشوائية" لكل نجم). هذا الفصل ضروري لأن
-// CSS animation على transform تستبدل قيمة transform الثابتة بالكامل أثناء
-// التحريك (ما تُدمَج تلقائياً) — فصل الدوران الثابت عن الحركة المتحركة بعنصرين
-// منفصلين يتفادى هذا التعارض.
+// ⚠️ تصحيح خلل حقيقي بطلب صريح: النسخة الأولى كانت خطوط ممطوطة (streaks) بمدة
+// 2.5-5 ثانية بس — يعطي إحساس شهب/نيازك سريعة، مو نجوم هادئة. الآن: نقاط دائرية
+// عادية (بدون أي مط)، بمدة 18-32 ثانية للرحلة الكاملة من المركز للحافة —
+// حركة بطيئة جداً بالكاد تُلاحَظ إلا بعد تركيز، تماماً زي المطلوب.
 
 import { useMemo } from 'react';
 
-const STAR_COUNT = 160;
-const MAX_TRAVEL = 900; // px — يكفي لتغطية أي حجم شاشة معقول
+const STAR_COUNT = 130;
+const MAX_TRAVEL = 700; // px
 
-const STAR_COLORS = ['#dce8ff', '#ffffff', '#fff4d9', '#cfe3ff'];
+const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff'];
 
 function generateWarpStars() {
   return Array.from({ length: STAR_COUNT }, (_, i) => ({
     id: i,
     angleDeg: Math.random() * 360,
-    duration: Math.random() * 2.5 + 2.5, // 2.5–5 ثانية لكل "رحلة" نجم واحد
-    delay: -Math.random() * 6, // تأخير سالب = يبدأ التحريك بمنتصف الدورة فوراً، بدل ما كل النجوم "تولد" مع بعض بلحظة الفتح
-    length: Math.random() * 30 + 14,
-    thickness: Math.random() * 1.3 + 0.6,
+    duration: Math.random() * 14 + 18, // 18–32 ثانية: بطيء جداً وناعم
+    delay: -Math.random() * 30, // سالب = يبدأ منتصف الرحلة فوراً، بدون "ولادة" جماعية بلحظة الفتح
+    size: Math.random() * 2 + 1,
     color: STAR_COLORS[i % STAR_COLORS.length],
   }));
 }
 
-export function ScreensaverWarp({ onDismiss }) {
+export function ScreensaverWarp({ onDismiss, caption }) {
   const stars = useMemo(generateWarpStars, []);
 
   return (
@@ -47,10 +43,11 @@ export function ScreensaverWarp({ onDismiss }) {
           <div key={s.id} style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, transform: `rotate(${s.angleDeg}deg)` }}>
             <div
               style={{
-                position: 'absolute', top: -s.thickness / 2, left: 0,
-                width: s.length, height: s.thickness, borderRadius: s.thickness,
-                background: `linear-gradient(to right, transparent, ${s.color})`,
-                animation: `priora-warp-fly ${s.duration}s cubic-bezier(.4,0,.8,1) ${s.delay}s infinite`,
+                position: 'absolute', top: -s.size / 2, left: 0,
+                width: s.size, height: s.size, borderRadius: '50%',
+                background: s.color,
+                boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
+                animation: `priora-warp-drift ${s.duration}s linear ${s.delay}s infinite`,
               }}
             />
           </div>
@@ -64,16 +61,22 @@ export function ScreensaverWarp({ onDismiss }) {
           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
         />
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-          Move or click to continue
+          Click to continue
         </p>
       </div>
 
+      {caption && (
+        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
+          {caption}
+        </p>
+      )}
+
       <style>{`
-        @keyframes priora-warp-fly {
-          0% { transform: translateX(0) scaleX(.3); opacity: 0; }
-          12% { opacity: 1; }
-          85% { opacity: 1; }
-          100% { transform: translateX(${MAX_TRAVEL}px) scaleX(1); opacity: 0; }
+        @keyframes priora-warp-drift {
+          0% { transform: translateX(0) scale(.4); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateX(${MAX_TRAVEL}px) scale(1.3); opacity: 0; }
         }
         @keyframes priora-logo-glow {
           0%, 100% { filter: drop-shadow(0 0 6px rgba(99,140,255,.25)) brightness(.92); }
@@ -83,3 +86,4 @@ export function ScreensaverWarp({ onDismiss }) {
     </div>
   );
 }
+

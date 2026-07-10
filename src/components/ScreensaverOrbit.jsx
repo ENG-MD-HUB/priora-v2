@@ -30,7 +30,7 @@ const RINGS = [
   { inset: 56, duration: 34, reverse: false, color: '#5fd8e8', ringColor: 'rgba(99,200,220,.16)' },
 ];
 
-export function ScreensaverOrbit({ onDismiss }) {
+export function ScreensaverOrbit({ onDismiss, caption }) {
   const stars = useMemo(generateFaintStars, []);
 
   return (
@@ -82,8 +82,14 @@ export function ScreensaverOrbit({ onDismiss }) {
       </div>
 
       <p style={{ position: 'absolute', bottom: '12%', fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-        Move or click to continue
+        Click to continue
       </p>
+
+      {caption && (
+        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
+          {caption}
+        </p>
+      )}
 
       <style>{`
         @keyframes priora-orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

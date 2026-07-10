@@ -17,7 +17,21 @@
 import { useMemo } from 'react';
 
 const STAR_COUNT = 90;
-const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff', '#ffe9d6']; // أبيض، أزرق فاتح، أصفر فاتح، أزرق سماوي فاتح، عاجي فاتح
+// ⚠️ تصحيح بطلب صريح: أضفت نجوم برتقالية وموف نادرة (زي النجوم الحقيقية —
+// أغلب النجوم بيضاء/زرقاء فاتحة، وقلة قليلة عملاقة حمراء/برتقالية أو نادرة
+// جداً بنفسجية). الألوان الشائعة مكررة أكثر بالمصفوفة عمداً (توزيع احتمالي
+// موزون) عشان الألوان النادرة تضل نادرة فعلاً، مو نص النجوم.
+const STAR_COLORS = [
+  '#ffffff', '#ffffff', '#ffffff', // أبيض — الأكثر شيوعاً
+  '#dce8ff', '#dce8ff', '#cfe3ff', // أزرق فاتح/سماوي — شائع
+  '#fff4d9', '#ffe9d6', // أصفر/عاجي فاتح — شائع
+  '#ffb87a', // برتقالي (نجم عملاق نادر) — نادر
+  '#c9a8ff', // موف خفيف (نادر جداً، لمسة فنية) — نادر جداً
+];
+
+// ⚠️ تصحيح بطلب صريح: مدى السرعة كان 1.5-6.5 ثانية بس (كل النجوم تقريباً بنفس
+// النطاق السريع). الآن مدى أوسع بكثير (1.5-10.5 ثانية) — بعض النجوم توضح تومض
+// ببطء شديد وهادئ، وبعضها يضل أسرع نسبياً، بتباين واقعي أكبر.
 
 const OPACITY_LEVELS = [0.45, 0.6, 0.75, 0.85, 0.95]; // 5 مستويات سطوع ثابتة (تنوّع كافٍ بصرياً، بدون توليد مئات قواعد @keyframes منفصلة)
 
@@ -27,8 +41,8 @@ function generateStars() {
     left: Math.random() * 100,
     top: Math.random() * 100,
     size: Math.random() * 2.6 + 0.8, // تنوّع أوضح بالحجم (0.8 إلى 3.4px)
-    duration: Math.random() * 5 + 1.5, // تنوّع أوضح بالسرعة (1.5 إلى 6.5 ثانية)
-    delay: Math.random() * 5,
+    duration: Math.random() * 9 + 1.5, // تنوّع أوسع بالسرعة (1.5 إلى 10.5 ثانية)
+    delay: Math.random() * 8,
     color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
     pattern: i % 4,
     opacityLevel: i % OPACITY_LEVELS.length,
@@ -49,7 +63,7 @@ function buildStarKeyframes() {
     `).join('\n');
 }
 
-export function Screensaver({ onDismiss }) {
+export function Screensaver({ onDismiss, caption }) {
   const stars = useMemo(generateStars, []);
   const starKeyframesCSS = useMemo(buildStarKeyframes, []);
 
@@ -81,9 +95,15 @@ export function Screensaver({ onDismiss }) {
           style={{ height: 56, objectFit: 'contain', animation: 'priora-logo-glow 4s ease-in-out infinite' }}
         />
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-          Move or click to continue
+          Click to continue
         </p>
       </div>
+
+      {caption && (
+        <p style={{ position: 'absolute', bottom: '6%', fontSize: 12, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em', fontStyle: 'italic', textAlign: 'center', padding: '0 20px' }}>
+          {caption}
+        </p>
+      )}
 
       <style>{`
         ${starKeyframesCSS}
