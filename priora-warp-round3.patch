@@ -1,0 +1,101 @@
+diff --git a/src/components/ScreensaverWarp.jsx b/src/components/ScreensaverWarp.jsx
+index 8a5ae4d..ac8541e 100644
+--- a/src/components/ScreensaverWarp.jsx
++++ b/src/components/ScreensaverWarp.jsx
+@@ -1,17 +1,25 @@
+ // ScreensaverWarp.jsx
+-// تصميم رابع لشاشة التوقف — نجوم عادية (نقاط، زي Starfield بالضبط) لكن تنجرف
+-// ببطء شديد من المنتصف للخارج، بإحساس ناعم هادئ (مو سرعة ضوء ولا شهب) — يشبه
+-// إنك تطفو ببطء وسط حقل نجوم، مو تنطلق بسرعة عبره.
++// تصميم رابع لشاشة التوقف — نجوم عادية (نقاط، زي Starfield) تنجرف ببطء شديد
++// من حول الشعار للخارج، بإحساس "أنا داخل بالفضاء وأطفو ببطء وسطه" — مو سرعة
++// ضوء، مو شهب.
+ //
+-// ⚠️ تصحيح خلل حقيقي بطلب صريح: النسخة الأولى كانت خطوط ممطوطة (streaks) بمدة
+-// 2.5-5 ثانية بس — يعطي إحساس شهب/نيازك سريعة، مو نجوم هادئة. الآن: نقاط دائرية
+-// عادية (بدون أي مط)، بمدة 18-32 ثانية للرحلة الكاملة من المركز للحافة —
+-// حركة بطيئة جداً بالكاد تُلاحَظ إلا بعد تركيز، تماماً زي المطلوب.
++// ⚠️ تصحيحات حقيقية بطلب صريح (محاولة ثانية):
++// 1. السرعة كانت لسا سريعة نسبياً (18-32 ثانية) — الآن أبطأ بكثير (35-60 ثانية
++//    للرحلة الكاملة)، بالكاد تُلاحَظ الحركة إلا بعد تركيز فعلي.
++// 2. النجوم كانت متشابهة الحجم/السطوع ("حبيبات ملح") — الآن تفاوت حقيقي بالحجم
++//    (0.6-3.2px) والسطوع (opacity نهائي مختلف لكل نجم، مو نفس القيمة للكل)،
++//    فيصير فيه نجوم خافتة وأخرى واضحة، قريبة من بعض بأحجام مختلفة — زي سماء
++//    حقيقية، مو نمط متكرر موحّد.
++// 3. النجوم كانت تبدأ بالضبط من نقطة الشعار (نصف قطر=0)، فتبدو "تنفجر من كلمة
++//    Priora" بصرياً — الآن تبدأ بعد نصف قطر أدنى (يتجاوز مساحة الشعار)، فتظهر
++//    وكأنها موجودة أصلاً بالفضاء المحيط وتتحرك ببطء (إحساس "أنا داخل الفضاء")
++//    بدل الانبثاق من النص نفسه.
+ 
+ import { useMemo } from 'react';
+ 
+-const STAR_COUNT = 130;
+-const MAX_TRAVEL = 700; // px
++const STAR_COUNT = 150;
++const MIN_RADIUS = 90; // px — يتجاوز مساحة الشعار، يمنع إحساس "الانبثاق من النص"
++const MAX_TRAVEL = 650; // px إضافية بعد نقطة البداية
+ 
+ const STAR_COLORS = ['#ffffff', '#dce8ff', '#fff4d9', '#cfe3ff'];
+ 
+@@ -19,9 +27,10 @@ function generateWarpStars() {
+   return Array.from({ length: STAR_COUNT }, (_, i) => ({
+     id: i,
+     angleDeg: Math.random() * 360,
+-    duration: Math.random() * 14 + 18, // 18–32 ثانية: بطيء جداً وناعم
+-    delay: -Math.random() * 30, // سالب = يبدأ منتصف الرحلة فوراً، بدون "ولادة" جماعية بلحظة الفتح
+-    size: Math.random() * 2 + 1,
++    duration: Math.random() * 25 + 35, // 35–60 ثانية: بطيء جداً وناعم
++    delay: -Math.random() * 55, // سالب = يبدأ منتصف الرحلة فوراً، بدون "ولادة" جماعية بلحظة الفتح
++    size: Math.random() * 2.6 + 0.6, // تفاوت حقيقي بالحجم (0.6–3.2px)
++    finalOpacity: Math.random() * 0.55 + 0.4, // تفاوت حقيقي بالسطوع (0.4–0.95) — بعض النجوم خافتة، بعضها واضحة
+     color: STAR_COLORS[i % STAR_COLORS.length],
+   }));
+ }
+@@ -40,14 +49,14 @@ export function ScreensaverWarp({ onDismiss, caption }) {
+     >
+       <div style={{ position: 'absolute', top: '50%', left: '50%', width: 0, height: 0 }}>
+         {stars.map((s) => (
+-          <div key={s.id} style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, transform: `rotate(${s.angleDeg}deg)` }}>
++          <div key={s.id} style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, transform: `rotate(${s.angleDeg}deg) translateX(${MIN_RADIUS}px)` }}>
+             <div
+               style={{
+                 position: 'absolute', top: -s.size / 2, left: 0,
+                 width: s.size, height: s.size, borderRadius: '50%',
+                 background: s.color,
+-                boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
+-                animation: `priora-warp-drift ${s.duration}s linear ${s.delay}s infinite`,
++                boxShadow: `0 0 ${s.size * 1.8}px ${s.color}`,
++                animation: `priora-warp-drift-${Math.round(s.finalOpacity * 100)} ${s.duration}s linear ${s.delay}s infinite`,
+               }}
+             />
+           </div>
+@@ -72,12 +81,18 @@ export function ScreensaverWarp({ onDismiss, caption }) {
+       )}
+ 
+       <style>{`
+-        @keyframes priora-warp-drift {
+-          0% { transform: translateX(0) scale(.4); opacity: 0; }
+-          10% { opacity: 1; }
+-          90% { opacity: 1; }
+-          100% { transform: translateX(${MAX_TRAVEL}px) scale(1.3); opacity: 0; }
+-        }
++        /* ⚠️ توليد 56 قاعدة @keyframes ثابتة (مستوى سطوع نهائي لكل 1% من 40 لـ95)
++           بدل قراءة متغيّر CSS مخصّص داخل keyframes (دعم غير موحّد بالمتصفحات) —
++           كل نجم يختار القاعدة المطابقة لسطوعه النهائي المحسوب مسبقاً بـJavaScript. */
++        ${Array.from({ length: 56 }, (_, i) => {
++          const op = (40 + i) / 100;
++          return `@keyframes priora-warp-drift-${40 + i} {
++            0% { transform: translateX(0) scale(.5); opacity: 0; }
++            8% { opacity: ${op}; }
++            92% { opacity: ${op}; }
++            100% { transform: translateX(${MAX_TRAVEL}px) scale(1.2); opacity: 0; }
++          }`;
++        }).join('\n')}
+         @keyframes priora-logo-glow {
+           0%, 100% { filter: drop-shadow(0 0 6px rgba(99,140,255,.25)) brightness(.92); }
+           50% { filter: drop-shadow(0 0 28px rgba(120,160,255,.75)) brightness(1.15); }
+@@ -87,3 +102,4 @@ export function ScreensaverWarp({ onDismiss, caption }) {
+   );
+ }
+ 
++
