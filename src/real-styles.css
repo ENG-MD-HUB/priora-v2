@@ -221,12 +221,19 @@ mark {
 .btn-primary:hover { opacity: .88; }
 .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
 
-/* نصوص اسم/ملاحظة التاسك بصفوف الجدول — قصّ بنقاط على الشاشات الكبيرة، كسر كلام
-   كامل بدون قصّ على الموبايل (تُستبدل تلقائياً بالـ media query أدناه). */
+/* نصوص اسم/ملاحظة التاسك بصفوف الجدول — بطلب صريح: بحد أقصى سطرين (بدل سطر
+   وحد مقصوص) على الشاشات الكبيرة، مع "..." بنهاية السطر الثاني لو النص أطول.
+   يطبَّق تلقائياً على كل تاسك يستخدم هذي الأصناف — شخصي وورك سبيس معاً (TaskRow،
+   FolderTaskRow، WorkspaceTaskRow) بما إنها كلها تشترك بنفس الأصناف. كسر كلام
+   كامل بدون قصّ يبقى كما هو على الموبايل (media query أدناه، غير محدود بعمد —
+   مساحة كافية بالتصميم المكدَّس عمودياً هناك). */
 .task-name-text, .task-note-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* صف البحث/الفلاتر/الترتيب بصفحة تفاصيل الورك سبيس: على شاشات ضيقة، البحث ينزل

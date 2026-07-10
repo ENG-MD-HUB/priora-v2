@@ -77,12 +77,12 @@ export function ScreensaverWarp({ onDismiss, caption, brand }) {
       {(caption || brand) && (
         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
           {caption && (
-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', fontFamily: "'Exo 2', sans-serif", margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
               {caption}
             </p>
           )}
           {brand && (
-            <p style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,.28)', letterSpacing: '.14em', textTransform: 'uppercase', margin: '7px 0 0' }}>
+            <p style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,.28)', letterSpacing: '.14em', textTransform: 'uppercase', fontFamily: "'Exo 2', sans-serif", margin: '7px 0 0' }}>
               {brand}
             </p>
           )}

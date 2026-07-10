@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
 import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
 const SCREENSAVER_DESIGN_OPTIONS = [
@@ -95,6 +95,17 @@ const SCREENSAVER_DESIGN_OPTIONS = [
       </>
     ),
   },
+  {
+    id: 'synthwave',
+    label: 'Synthwave',
+    previewBg: 'linear-gradient(to bottom, #170a3a 0%, #7a1f5e 60%, #2a0a3d 100%)',
+    previewElement: (
+      <>
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(180deg,#ffe28a,#ff7a8a,#a730c9)' }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,120,220,.7) 0, rgba(255,120,220,.7) 1px, transparent 1px, transparent 6px)' }} />
+      </>
+    ),
+  },
 ];
 
 const FEATURES_LIST = [
@@ -138,7 +149,6 @@ export function SettingsModal({ onClose, fontScale }) {
   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
-  const [screensaverBrand, setScreensaverBrandState] = useState(getScreensaverBrand);
 
   function handleToggleScreensaver(value) {
     setScreensaverEnabledState(value);
@@ -155,10 +165,6 @@ export function SettingsModal({ onClose, fontScale }) {
     setScreensaverDesignState(safe);
   }
 
-  function handleChangeScreensaverBrand(text) {
-    setScreensaverBrandState(text);
-    setScreensaverBrand(text);
-  }
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const fileInputRef = useRef(null);
@@ -456,18 +462,6 @@ export function SettingsModal({ onClose, fontScale }) {
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div style={{ marginTop: 14 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Signature line (optional, smaller text below)</div>
-                      <input
-                        type="text"
-                        value={screensaverBrand}
-                        onChange={(e) => handleChangeScreensaverBrand(e.target.value)}
-                        placeholder="e.g. your company name or © 2026"
-                        maxLength={60}
-                        className="input"
-                      />
                     </div>
                   </>
                 )}

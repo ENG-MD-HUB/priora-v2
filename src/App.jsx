@@ -35,6 +35,7 @@ import { ScreensaverAurora } from './components/ScreensaverAurora';
 import { ScreensaverOrbit } from './components/ScreensaverOrbit';
 import { ScreensaverWarp } from './components/ScreensaverWarp';
 import { ScreensaverGalaxy } from './components/ScreensaverGalaxy';
+import { ScreensaverSynthwave } from './components/ScreensaverSynthwave';
 import { shouldMigrateFoldersToSubfolders, runFoldersToSubfoldersMigration, markFoldersMigrated } from './utils/migrateFoldersToSubfolders';
 import { LoginScreen } from './components/LoginScreen';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -52,7 +53,7 @@ import { GlobalSearchPage } from './components/GlobalSearchPage';
 // أسماء الصفحات اللي لها محتوى خاص بها دائماً (مش خاضعة لاستبدال نتائج البحث
 // الشامل) — نسخة من المتغير Bt بالكود الأصلي.
 const VIEWS_WITH_OWN_CONTENT = ['dashboard', 'completed', 'trash', 'contacts', 'workspaces'];
-const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit, warp: ScreensaverWarp, galaxy: ScreensaverGalaxy };
+const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit, warp: ScreensaverWarp, galaxy: ScreensaverGalaxy, synthwave: ScreensaverSynthwave };
 
 function AuthenticatedApp() {
   const activeView = useUIStore((s) => s.activeView);
