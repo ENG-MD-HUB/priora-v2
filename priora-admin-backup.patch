@@ -1,0 +1,163 @@
+diff --git a/src/components/SettingsModal.jsx b/src/components/SettingsModal.jsx
+index 56c8b6c..9c08589 100644
+--- a/src/components/SettingsModal.jsx
++++ b/src/components/SettingsModal.jsx
+@@ -28,6 +28,7 @@ import { showToast } from '../store/toastStore';
+ import { APP_VERSION } from '../utils/appConstants';
+ import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
+ import { FontScaleControl } from './FontScaleControl';
++import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
+ 
+ const SCREENSAVER_DESIGN_OPTIONS = [
+   {
+@@ -93,6 +94,7 @@ const SETTINGS_TABS = [
+ export function SettingsModal({ onClose, fontScale }) {
+   const user = useAuthStore((s) => s.user);
+   const setUser = useAuthStore((s) => s.setUser);
++  const [adminBackupLoading, setAdminBackupLoading] = useState(false);
+   const theme = useUIStore((s) => s.theme);
+   const setTheme = useUIStore((s) => s.setTheme);
+   const lang = useUIStore((s) => s.lang);
+@@ -142,6 +144,25 @@ export function SettingsModal({ onClose, fontScale }) {
+     }
+   }
+ 
++  // ⚠️ إضافة بطلب صريح: نسخة احتياطية كاملة لقاعدة البيانات (كل المستخدمين).
++  // الحماية الحقيقية بقاعدة أمان Firestore (السيرفر) — هذا التحقق هنا (isAdminUser)
++  // مجرد تحسين تجربة استخدام (يخفي الزر عن غير الأدمن)، مو الحماية الفعلية.
++  async function handleAdminBackup() {
++    setAdminBackupLoading(true);
++    showToast('Running full admin backup — this may take a moment…');
++    try {
++      const data = await runFullAdminBackup(user?.uid);
++      downloadBackupJson(data);
++      const userCount = Object.keys(data.users).length;
++      const wsCount = Object.keys(data.workspaces).length;
++      showToast(`Admin backup complete — ${userCount} users, ${wsCount} workspaces`);
++    } catch (err) {
++      showToast(err instanceof Error ? err.message : 'Admin backup failed', 'error');
++    } finally {
++      setAdminBackupLoading(false);
++    }
++  }
++
+   async function handleExportBackup() {
+     showToast('Preparing backup…');
+     const wsTasks = {};
+@@ -446,6 +467,26 @@ export function SettingsModal({ onClose, fontScale }) {
+                 </button>
+               </div>
+ 
++              {isAdminUser(user?.uid) && (
++                <div style={{ background: 'color-mix(in srgb, var(--red) 6%, var(--surface2))', border: '1px solid color-mix(in srgb, var(--red) 30%, var(--border))', borderRadius: 10, padding: '16px 18px' }}>
++                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}>⚠ Admin: Full Database Backup</div>
++                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, lineHeight: 1.5 }}>
++                    Exports every user's data and every workspace — visible only to the admin account.
++                  </div>
++                  <button
++                    onClick={handleAdminBackup}
++                    disabled={adminBackupLoading}
++                    style={{
++                      display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', background: 'var(--red)',
++                      color: '#fff', border: 'none', borderRadius: 7, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500,
++                      cursor: adminBackupLoading ? 'not-allowed' : 'pointer', opacity: adminBackupLoading ? 0.6 : 1,
++                    }}
++                  >
++                    {adminBackupLoading ? 'Backing up…' : 'Download Full Admin Backup'}
++                  </button>
++                </div>
++              )}
++
+               <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
+                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Restore from Backup</div>
+                 <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, lineHeight: 1.5 }}>
+diff --git a/src/utils/adminBackup.js b/src/utils/adminBackup.js
+new file mode 100644
+index 0000000..c5dec73
+--- /dev/null
++++ b/src/utils/adminBackup.js
+@@ -0,0 +1,84 @@
++// adminBackup.js
++// ⚠️ إضافة جديدة بطلب صريح: نسخة احتياطية كاملة لقاعدة البيانات (كل المستخدمين
++// + كل الورك سبيسات) — مجانية بالكامل (بدون Blaze/Cloud Functions)، وآمنة فعلياً
++// (الحماية عبر هوية Firebase Auth الحقيقية + قاعدة أمان Firestore، مو كلمة سر
++// بكود العميل القابل للاكتشاف).
++//
++// ⚠️ حرج جداً: ADMIN_UID هنا لازم يطابق بالضبط الـUID المكتوب بقاعدة الأمان
++// (Firestore Rules) اللي أضافها المستخدم بلوحة تحكم Firebase. القراءة الفعلية
++// لبيانات كل المستخدمين محمية هناك (بجانب السيرفر) — مو بهذا التحقق هنا (اللي هو
++// مجرد تحسين لتجربة الاستخدام: نخفي الزر عن غير الأدمن، لا أكثر). حتى لو حد عدّل
++// هذا الملف بالمتصفح وحاول يشغّل الدالة، قاعدة الأمان بالسيرفر ترفض الطلب لأي
++// حساب غير حساب الأدمن الحقيقي.
++const ADMIN_UID = 'iFAIMlJKV9OrTEK0JlCEwAQNTpN2';
++
++import { collectionGroup, collection, getDocs } from 'firebase/firestore';
++import { getUserScopedDb } from '../services/firebaseClient';
++
++export function isAdminUser(uid) {
++  return uid === ADMIN_UID;
++}
++
++/**
++ * يجمع بيانات كل المستخدمين (tasks/folders/contacts/trash/deletedFolders) وكل
++ * الورك سبيسات (المعلومات الأساسية + tasks + notifications) بكائن واحد منظّم:
++ * { exportedAt, users: { [uid]: {...} }, workspaces: { [wsId]: {...} } }
++ *
++ * يستخدم collectionGroup — يجيب كل المستندات بنفس اسم الـsubcollection عبر كل
++ * المستخدمين/الورك سبيسات دفعة وحدة (بدل ما نحتاج نعرف كل uid مسبقاً)، ونفرزها
++ * حسب المستند الأب (users/{uid}/... أو workspaces/{wsId}/...) عن طريق مسار
++ * المرجع (ref.parent.parent).
++ */
++export async function runFullAdminBackup(currentUid) {
++  if (!isAdminUser(currentUid)) {
++    throw new Error('Not authorized — admin backup is restricted to the admin account.');
++  }
++
++  const db = await getUserScopedDb();
++  const result = { exportedAt: new Date().toISOString(), users: {}, workspaces: {} };
++
++  const personalSubcollections = ['tasks', 'folders', 'contacts', 'trash', 'deletedFolders'];
++  const workspaceSubcollections = ['tasks', 'notifications'];
++
++  for (const name of personalSubcollections) {
++    const snap = await getDocs(collectionGroup(db, name));
++    for (const d of snap.docs) {
++      const userDocRef = d.ref.parent.parent; // users/{uid}
++      if (!userDocRef || userDocRef.parent.id !== 'users') continue;
++      const uid = userDocRef.id;
++      result.users[uid] ??= {};
++      result.users[uid][name] ??= [];
++      result.users[uid][name].push({ id: d.id, ...d.data() });
++    }
++  }
++
++  for (const name of workspaceSubcollections) {
++    const snap = await getDocs(collectionGroup(db, name));
++    for (const d of snap.docs) {
++      const wsDocRef = d.ref.parent.parent; // workspaces/{wsId}
++      if (!wsDocRef || wsDocRef.parent.id !== 'workspaces') continue;
++      const wsId = wsDocRef.id;
++      result.workspaces[wsId] ??= {};
++      result.workspaces[wsId][name] ??= [];
++      result.workspaces[wsId][name].push({ id: d.id, ...d.data() });
++    }
++  }
++
++  const wsSnap = await getDocs(collection(db, 'workspaces'));
++  for (const d of wsSnap.docs) {
++    result.workspaces[d.id] ??= {};
++    result.workspaces[d.id].meta = { id: d.id, ...d.data() };
++  }
++
++  return result;
++}
++
++export function downloadBackupJson(backupData) {
++  const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  link.href = url;
++  link.download = `priora-ADMIN-full-backup-${new Date().toISOString().split('T')[0]}.json`;
++  link.click();
++  URL.revokeObjectURL(url);
++}

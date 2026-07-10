@@ -28,6 +28,7 @@ import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
 import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
 import { FontScaleControl } from './FontScaleControl';
+import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
 const SCREENSAVER_DESIGN_OPTIONS = [
   {
@@ -93,6 +94,7 @@ const SETTINGS_TABS = [
 export function SettingsModal({ onClose, fontScale }) {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const [adminBackupLoading, setAdminBackupLoading] = useState(false);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
   const lang = useUIStore((s) => s.lang);
@@ -139,6 +141,25 @@ export function SettingsModal({ onClose, fontScale }) {
       showToast(err instanceof Error ? err.message : 'Failed to update');
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  // ⚠️ إضافة بطلب صريح: نسخة احتياطية كاملة لقاعدة البيانات (كل المستخدمين).
+  // الحماية الحقيقية بقاعدة أمان Firestore (السيرفر) — هذا التحقق هنا (isAdminUser)
+  // مجرد تحسين تجربة استخدام (يخفي الزر عن غير الأدمن)، مو الحماية الفعلية.
+  async function handleAdminBackup() {
+    setAdminBackupLoading(true);
+    showToast('Running full admin backup — this may take a moment…');
+    try {
+      const data = await runFullAdminBackup(user?.uid);
+      downloadBackupJson(data);
+      const userCount = Object.keys(data.users).length;
+      const wsCount = Object.keys(data.workspaces).length;
+      showToast(`Admin backup complete — ${userCount} users, ${wsCount} workspaces`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Admin backup failed', 'error');
+    } finally {
+      setAdminBackupLoading(false);
     }
   }
 
@@ -445,6 +466,26 @@ export function SettingsModal({ onClose, fontScale }) {
                   Download Backup
                 </button>
               </div>
+
+              {isAdminUser(user?.uid) && (
+                <div style={{ background: 'color-mix(in srgb, var(--red) 6%, var(--surface2))', border: '1px solid color-mix(in srgb, var(--red) 30%, var(--border))', borderRadius: 10, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}>⚠ Admin: Full Database Backup</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, lineHeight: 1.5 }}>
+                    Exports every user's data and every workspace — visible only to the admin account.
+                  </div>
+                  <button
+                    onClick={handleAdminBackup}
+                    disabled={adminBackupLoading}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', background: 'var(--red)',
+                      color: '#fff', border: 'none', borderRadius: 7, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500,
+                      cursor: adminBackupLoading ? 'not-allowed' : 'pointer', opacity: adminBackupLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {adminBackupLoading ? 'Backing up…' : 'Download Full Admin Backup'}
+                  </button>
+                </div>
+              )}
 
               <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Restore from Backup</div>
