@@ -20,11 +20,11 @@ import { useState, useEffect, useRef } from 'react';
 
 const DEFAULT_TIMEOUT_MINUTES = 5;
 const MIN_TIMEOUT_MINUTES = 1;
-const DEFAULT_DESIGN = 'starfield';
+const DEFAULT_DESIGN = 'orbit';
 const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
 const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
 const MAX_CAPTION_LENGTH = 80;
-const DEFAULT_BRAND = '';
+const DEFAULT_BRAND = 'Developed by Mohammad M. Alamoudi';
 const MAX_BRAND_LENGTH = 60;
 
 const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';

@@ -26,8 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
-import { FontScaleControl } from './FontScaleControl';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
 import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
 const SCREENSAVER_DESIGN_OPTIONS = [
@@ -139,7 +138,6 @@ export function SettingsModal({ onClose, fontScale }) {
   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
-  const [screensaverCaption, setScreensaverCaptionState] = useState(getScreensaverCaption);
   const [screensaverBrand, setScreensaverBrandState] = useState(getScreensaverBrand);
 
   function handleToggleScreensaver(value) {
@@ -155,11 +153,6 @@ export function SettingsModal({ onClose, fontScale }) {
   function handleChangeScreensaverDesign(design) {
     const safe = setScreensaverDesign(design);
     setScreensaverDesignState(safe);
-  }
-
-  function handleChangeScreensaverCaption(text) {
-    setScreensaverCaptionState(text); // تحديث فوري بالحقل نفسه (بدون قص أثناء الكتابة)
-    setScreensaverCaption(text); // الحفظ الفعلي (يقص للحد الأقصى) يصير بالخلفية
   }
 
   function handleChangeScreensaverBrand(text) {
@@ -466,18 +459,6 @@ export function SettingsModal({ onClose, fontScale }) {
                     </div>
 
                     <div style={{ marginTop: 14 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Bottom caption (optional)</div>
-                      <input
-                        type="text"
-                        value={screensaverCaption}
-                        onChange={(e) => handleChangeScreensaverCaption(e.target.value)}
-                        placeholder="e.g. a quote, your name, © Company"
-                        maxLength={80}
-                        className="input"
-                      />
-                    </div>
-
-                    <div style={{ marginTop: 10 }}>
                       <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Signature line (optional, smaller text below)</div>
                       <input
                         type="text"
@@ -490,14 +471,6 @@ export function SettingsModal({ onClose, fontScale }) {
                     </div>
                   </>
                 )}
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>App Size</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>Zoom level</span>
-                  {fontScale && <FontScaleControl fontScale={fontScale} />}
-                </div>
               </div>
             </div>
           )}

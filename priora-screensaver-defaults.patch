@@ -1,0 +1,151 @@
+diff --git a/src/components/Screensaver.jsx b/src/components/Screensaver.jsx
+index cf2841c..0eb9152 100644
+--- a/src/components/Screensaver.jsx
++++ b/src/components/Screensaver.jsx
+@@ -102,7 +102,7 @@ export function Screensaver({ onDismiss, caption, brand }) {
+       {(caption || brand) && (
+         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px' }}>
+           {caption && (
+-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
++            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+               {caption}
+             </p>
+           )}
+diff --git a/src/components/ScreensaverAurora.jsx b/src/components/ScreensaverAurora.jsx
+index 301cee7..ab6606f 100644
+--- a/src/components/ScreensaverAurora.jsx
++++ b/src/components/ScreensaverAurora.jsx
+@@ -40,7 +40,7 @@ export function ScreensaverAurora({ onDismiss, caption, brand }) {
+       {(caption || brand) && (
+         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px' }}>
+           {caption && (
+-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
++            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+               {caption}
+             </p>
+           )}
+diff --git a/src/components/ScreensaverGalaxy.jsx b/src/components/ScreensaverGalaxy.jsx
+index bd29471..c07fe92 100644
+--- a/src/components/ScreensaverGalaxy.jsx
++++ b/src/components/ScreensaverGalaxy.jsx
+@@ -87,7 +87,7 @@ export function ScreensaverGalaxy({ onDismiss, caption, brand }) {
+       {(caption || brand) && (
+         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px' }}>
+           {caption && (
+-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
++            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+               {caption}
+             </p>
+           )}
+diff --git a/src/components/ScreensaverOrbit.jsx b/src/components/ScreensaverOrbit.jsx
+index 77a617b..3533115 100644
+--- a/src/components/ScreensaverOrbit.jsx
++++ b/src/components/ScreensaverOrbit.jsx
+@@ -88,7 +88,7 @@ export function ScreensaverOrbit({ onDismiss, caption, brand }) {
+       {(caption || brand) && (
+         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px' }}>
+           {caption && (
+-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
++            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+               {caption}
+             </p>
+           )}
+diff --git a/src/components/ScreensaverWarp.jsx b/src/components/ScreensaverWarp.jsx
+index 7c98afa..b146b7f 100644
+--- a/src/components/ScreensaverWarp.jsx
++++ b/src/components/ScreensaverWarp.jsx
+@@ -77,7 +77,7 @@ export function ScreensaverWarp({ onDismiss, caption, brand }) {
+       {(caption || brand) && (
+         <div style={{ position: 'absolute', bottom: '6%', textAlign: 'center', padding: '0 20px', zIndex: 1 }}>
+           {caption && (
+-            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.55)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
++            <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,.85)', letterSpacing: '.06em', margin: 0, textShadow: '0 0 14px rgba(120,160,255,.3)' }}>
+               {caption}
+             </p>
+           )}
+diff --git a/src/components/SettingsModal.jsx b/src/components/SettingsModal.jsx
+index 11af599..7e34af5 100644
+--- a/src/components/SettingsModal.jsx
++++ b/src/components/SettingsModal.jsx
+@@ -26,8 +26,7 @@ import { trashService } from '../services/trashService';
+ import { contactsService } from '../services/contactsService';
+ import { showToast } from '../store/toastStore';
+ import { APP_VERSION } from '../utils/appConstants';
+-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverCaption, setScreensaverCaption, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
+-import { FontScaleControl } from './FontScaleControl';
++import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, getScreensaverBrand, setScreensaverBrand } from '../utils/useIdleScreensaver';
+ import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
+ 
+ const SCREENSAVER_DESIGN_OPTIONS = [
+@@ -139,7 +138,6 @@ export function SettingsModal({ onClose, fontScale }) {
+   const [screensaverEnabled, setScreensaverEnabledState] = useState(getScreensaverEnabled);
+   const [screensaverMinutes, setScreensaverMinutesState] = useState(getScreensaverMinutes);
+   const [screensaverDesign, setScreensaverDesignState] = useState(getScreensaverDesign);
+-  const [screensaverCaption, setScreensaverCaptionState] = useState(getScreensaverCaption);
+   const [screensaverBrand, setScreensaverBrandState] = useState(getScreensaverBrand);
+ 
+   function handleToggleScreensaver(value) {
+@@ -157,11 +155,6 @@ export function SettingsModal({ onClose, fontScale }) {
+     setScreensaverDesignState(safe);
+   }
+ 
+-  function handleChangeScreensaverCaption(text) {
+-    setScreensaverCaptionState(text); // تحديث فوري بالحقل نفسه (بدون قص أثناء الكتابة)
+-    setScreensaverCaption(text); // الحفظ الفعلي (يقص للحد الأقصى) يصير بالخلفية
+-  }
+-
+   function handleChangeScreensaverBrand(text) {
+     setScreensaverBrandState(text);
+     setScreensaverBrand(text);
+@@ -466,18 +459,6 @@ export function SettingsModal({ onClose, fontScale }) {
+                     </div>
+ 
+                     <div style={{ marginTop: 14 }}>
+-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Bottom caption (optional)</div>
+-                      <input
+-                        type="text"
+-                        value={screensaverCaption}
+-                        onChange={(e) => handleChangeScreensaverCaption(e.target.value)}
+-                        placeholder="e.g. a quote, your name, © Company"
+-                        maxLength={80}
+-                        className="input"
+-                      />
+-                    </div>
+-
+-                    <div style={{ marginTop: 10 }}>
+                       <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>Signature line (optional, smaller text below)</div>
+                       <input
+                         type="text"
+@@ -491,14 +472,6 @@ export function SettingsModal({ onClose, fontScale }) {
+                   </>
+                 )}
+               </div>
+-
+-              <div>
+-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>App Size</div>
+-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+-                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>Zoom level</span>
+-                  {fontScale && <FontScaleControl fontScale={fontScale} />}
+-                </div>
+-              </div>
+             </div>
+           )}
+ 
+diff --git a/src/utils/useIdleScreensaver.js b/src/utils/useIdleScreensaver.js
+index c35f616..f21eb26 100644
+--- a/src/utils/useIdleScreensaver.js
++++ b/src/utils/useIdleScreensaver.js
+@@ -20,11 +20,11 @@ import { useState, useEffect, useRef } from 'react';
+ 
+ const DEFAULT_TIMEOUT_MINUTES = 5;
+ const MIN_TIMEOUT_MINUTES = 1;
+-const DEFAULT_DESIGN = 'starfield';
++const DEFAULT_DESIGN = 'orbit';
+ const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
+ const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
+ const MAX_CAPTION_LENGTH = 80;
+-const DEFAULT_BRAND = '';
++const DEFAULT_BRAND = 'Developed by Mohammad M. Alamoudi';
+ const MAX_BRAND_LENGTH = 60;
+ 
+ const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
