@@ -52,6 +52,7 @@ export function Sidebar({ fontScale }) {
   const addFolder = useFoldersStore((s) => s.addFolder);
   const updateFolder = useFoldersStore((s) => s.updateFolder);
   const deleteFolderWithCascade = useFoldersStore((s) => s.deleteFolderWithCascade);
+  const reorderFolders = useFoldersStore((s) => s.reorderFolders);
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -78,8 +79,44 @@ export function Sidebar({ fontScale }) {
   const trashCount = trash.length;
   const userInitials = user?.displayName ? user.displayName.split(' ').map((p) => p[0]).join('').toUpperCase().slice(0, 2) : '?';
 
-  const rootFolders = folders.filter((f) => f.parentId === null || f.parentId === undefined);
-  const getChildFolders = (parentId) => folders.filter((f) => f.parentId === parentId);
+  // ⚠️ إضافة جديدة بطلب صريح: ترتيب الفولدرات حسب حقل order (سحب وإفلات) —
+  // فولدر بدون order بعد (قديم، من قبل هذي الميزة) يترتب تلقائياً بالنهاية
+  // حسب تاريخ الإنشاء، حتى ما يقفز لمكان عشوائي أول مرة.
+  function sortByOrder(a, b) {
+    const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+    const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
+  }
+
+  const rootFolders = folders.filter((f) => f.parentId === null || f.parentId === undefined).sort(sortByOrder);
+  const getChildFolders = (parentId) => folders.filter((f) => f.parentId === parentId).sort(sortByOrder);
+
+  const [draggedFolderId, setDraggedFolderId] = useState(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState(null);
+
+  // ⚠️ إضافة جديدة بطلب صريح: سحب-وإفلات لإعادة ترتيب الفولدرات، مع حفظ فوري
+  // بـFirestore. يسمح فقط بإعادة ترتيب فولدرات بنفس المستوى (كلها رئيسية، أو
+  // كلها فروع لنفس الأب) — إفلات على مستوى مختلف يُتجاهَل بأمان (fromIdx === -1).
+  function handleFolderDrop(targetFolder, isTargetRoot) {
+    if (!draggedFolderId || draggedFolderId === targetFolder.id) {
+      setDraggedFolderId(null);
+      setDragOverFolderId(null);
+      return;
+    }
+    const siblings = isTargetRoot ? rootFolders : getChildFolders(targetFolder.parentId);
+    const siblingIds = siblings.map((f) => f.id);
+    const fromIdx = siblingIds.indexOf(draggedFolderId);
+    const toIdx = siblingIds.indexOf(targetFolder.id);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const reordered = [...siblingIds];
+      reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, draggedFolderId);
+      reorderFolders(reordered);
+    }
+    setDraggedFolderId(null);
+    setDragOverFolderId(null);
+  }
 
   function toggleRootExpanded(id) {
     setExpandedRootIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -168,10 +205,17 @@ export function Sidebar({ fontScale }) {
     return (
       <div key={folder.id}>
         <div
+          draggable
+          onDragStart={(e) => { setDraggedFolderId(folder.id); e.dataTransfer.effectAllowed = 'move'; }}
+          onDragOver={(e) => { e.preventDefault(); if (draggedFolderId && draggedFolderId !== folder.id) setDragOverFolderId(folder.id); }}
+          onDragLeave={() => setDragOverFolderId((prev) => (prev === folder.id ? null : prev))}
+          onDrop={(e) => { e.preventDefault(); handleFolderDrop(folder, isRoot); }}
+          onDragEnd={() => { setDraggedFolderId(null); setDragOverFolderId(null); }}
           style={{
-            display: 'flex', alignItems: 'center',
-            background: isActive ? 'var(--accent-light)' : 'none',
-            borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+            display: 'flex', alignItems: 'center', cursor: 'grab',
+            background: isActive ? 'var(--accent-light)' : dragOverFolderId === folder.id ? 'var(--surface2)' : 'none',
+            borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : dragOverFolderId === folder.id ? 'var(--accent)' : 'transparent'}`,
+            opacity: draggedFolderId === folder.id ? 0.4 : 1,
             transition: 'background .12s',
           }}
           onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface2)'; }}

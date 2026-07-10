@@ -33,6 +33,15 @@ const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
 const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
 const BRAND_STORAGE_KEY = 'priora_screensaver_brand';
 const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
+const PREVIEW_TRIGGER_EVENT = 'priora-screensaver-preview-trigger';
+
+// ⚠️ إضافة جديدة بطلب صريح: تشغيل شاشة التوقف فوراً للمعاينة (زر بالإعدادات)،
+// بدون انتظار مدة الخمول الفعلية. نفس نمط أحداث النافذة (window Event) المستخدم
+// أصلاً لمزامنة الإعدادات — أبسط طريقة توصل من SettingsModal (مودال منفصل) لهذا
+// الـhook (شغّال بـApp.jsx بمستوى أعلى) بدون تمرير props عبر طبقات كثيرة.
+export function triggerScreensaverPreview() {
+  window.dispatchEvent(new Event(PREVIEW_TRIGGER_EVENT));
+}
 
 export function getScreensaverEnabled() {
   if (typeof localStorage === 'undefined') return true;
@@ -137,6 +146,18 @@ export function useIdleScreensaver() {
     }
     window.addEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
+  }, []);
+
+  // ⚠️ إضافة جديدة بطلب صريح: يشغّل شاشة التوقف فوراً لما يوصل حدث المعاينة —
+  // بغض النظر عن مؤقّت الخمول الحالي (ما يلغيه ولا يوقفه، بس يعرض الشاشة الآن
+  // بالإضافة). الإغلاق بنفس طريقة العرض العادي (نقرة على الشاشة نفسها).
+  useEffect(() => {
+    function handlePreviewTrigger() {
+      isActiveRef.current = true;
+      setIsActive(true);
+    }
+    window.addEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
+    return () => window.removeEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
   }, []);
 
   function resetTimer() {

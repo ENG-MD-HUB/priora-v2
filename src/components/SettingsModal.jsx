@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, triggerScreensaverPreview } from '../utils/useIdleScreensaver';
 import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
 
 const SCREENSAVER_DESIGN_OPTIONS = [
@@ -463,6 +463,21 @@ export function SettingsModal({ onClose, fontScale }) {
                         ))}
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => triggerScreensaverPreview()}
+                      style={{
+                        marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                        padding: '9px 14px', background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)',
+                        borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      Preview screensaver
+                    </button>
                   </>
                 )}
               </div>

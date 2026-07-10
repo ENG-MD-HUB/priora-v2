@@ -79,6 +79,35 @@ export const useFoldersStore = create(
       },
 
       /**
+       * ⚠️ إضافة جديدة بطلب صريح: يعيد ترتيب الفولدرات (سحب وإفلات) — يأخذ قائمة
+       * IDs بالترتيب الجديد (لنفس المستوى/الأب فقط)، يحدّث حقل order محلياً فوراً
+       * (استجابة لحظية بالواجهة)، وبالتوازي يحفظ order الجديد لكل فولدر تغيّر
+       * ترتيبه فعلياً بـFirestore (تحديث جزئي لحقل order بس + إعادة محاولة، نفس
+       * نمط باقي الكتابات الآمنة بالتطبيق — ما يلمس أي حقل ثاني بالفولدر).
+       */
+      reorderFolders: (orderedIds) => {
+        const uid = useAuthStore.getState().user?.uid;
+        const before = get().folders;
+
+        set((state) => ({
+          folders: state.folders.map((f) => {
+            const newOrder = orderedIds.indexOf(f.id);
+            return newOrder === -1 ? f : { ...f, order: newOrder };
+          }),
+        }));
+
+        if (!uid || _disableFirestoreSyncForTesting) return;
+
+        orderedIds.forEach((id, newOrder) => {
+          const original = before.find((f) => f.id === id);
+          if (!original || original.order === newOrder) return; // ما تغيّر ترتيبه فعلياً — تجاهله، صفر كتابة زايدة
+          retryFirestoreWrite(() => foldersService.update(uid, id, { order: newOrder }), {
+            onFinalFailure: () => showToast(`Couldn't save the new folder order — check your connection and try again`, 'error'),
+          });
+        });
+      },
+
+      /**
        * ينقل تاسك لمجلد آخر (نقل بسيط لحقل folderId). لا تلمس Firestore الخاصة
        * بالمجلد نفسه — التاسك يُحدَّث عن طريق tasksStore.updateTask من الطبقة
        * الأعلى (هذا فقط مرجع مساعد يُستخدم بالواجهة، المنطق الفعلي بمكوّن منفصل

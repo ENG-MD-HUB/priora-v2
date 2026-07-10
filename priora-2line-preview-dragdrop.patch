@@ -1,0 +1,246 @@
+diff --git a/src/components/SettingsModal.jsx b/src/components/SettingsModal.jsx
+index 474fb65..7353400 100644
+--- a/src/components/SettingsModal.jsx
++++ b/src/components/SettingsModal.jsx
+@@ -26,7 +26,7 @@ import { trashService } from '../services/trashService';
+ import { contactsService } from '../services/contactsService';
+ import { showToast } from '../store/toastStore';
+ import { APP_VERSION } from '../utils/appConstants';
+-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
++import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, triggerScreensaverPreview } from '../utils/useIdleScreensaver';
+ import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
+ 
+ const SCREENSAVER_DESIGN_OPTIONS = [
+@@ -463,6 +463,21 @@ export function SettingsModal({ onClose, fontScale }) {
+                         ))}
+                       </div>
+                     </div>
++
++                    <button
++                      onClick={() => triggerScreensaverPreview()}
++                      style={{
++                        marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
++                        padding: '9px 14px', background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)',
++                        borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12, fontWeight: 500, cursor: 'pointer',
++                      }}
++                    >
++                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
++                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
++                        <circle cx="12" cy="12" r="3" />
++                      </svg>
++                      Preview screensaver
++                    </button>
+                   </>
+                 )}
+               </div>
+diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
+index ab80f43..5e7dea3 100644
+--- a/src/components/Sidebar.jsx
++++ b/src/components/Sidebar.jsx
+@@ -52,6 +52,7 @@ export function Sidebar({ fontScale }) {
+   const addFolder = useFoldersStore((s) => s.addFolder);
+   const updateFolder = useFoldersStore((s) => s.updateFolder);
+   const deleteFolderWithCascade = useFoldersStore((s) => s.deleteFolderWithCascade);
++  const reorderFolders = useFoldersStore((s) => s.reorderFolders);
+ 
+   const [now, setNow] = useState(new Date());
+   useEffect(() => {
+@@ -78,8 +79,44 @@ export function Sidebar({ fontScale }) {
+   const trashCount = trash.length;
+   const userInitials = user?.displayName ? user.displayName.split(' ').map((p) => p[0]).join('').toUpperCase().slice(0, 2) : '?';
+ 
+-  const rootFolders = folders.filter((f) => f.parentId === null || f.parentId === undefined);
+-  const getChildFolders = (parentId) => folders.filter((f) => f.parentId === parentId);
++  // ⚠️ إضافة جديدة بطلب صريح: ترتيب الفولدرات حسب حقل order (سحب وإفلات) —
++  // فولدر بدون order بعد (قديم، من قبل هذي الميزة) يترتب تلقائياً بالنهاية
++  // حسب تاريخ الإنشاء، حتى ما يقفز لمكان عشوائي أول مرة.
++  function sortByOrder(a, b) {
++    const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
++    const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
++    if (orderA !== orderB) return orderA - orderB;
++    return (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
++  }
++
++  const rootFolders = folders.filter((f) => f.parentId === null || f.parentId === undefined).sort(sortByOrder);
++  const getChildFolders = (parentId) => folders.filter((f) => f.parentId === parentId).sort(sortByOrder);
++
++  const [draggedFolderId, setDraggedFolderId] = useState(null);
++  const [dragOverFolderId, setDragOverFolderId] = useState(null);
++
++  // ⚠️ إضافة جديدة بطلب صريح: سحب-وإفلات لإعادة ترتيب الفولدرات، مع حفظ فوري
++  // بـFirestore. يسمح فقط بإعادة ترتيب فولدرات بنفس المستوى (كلها رئيسية، أو
++  // كلها فروع لنفس الأب) — إفلات على مستوى مختلف يُتجاهَل بأمان (fromIdx === -1).
++  function handleFolderDrop(targetFolder, isTargetRoot) {
++    if (!draggedFolderId || draggedFolderId === targetFolder.id) {
++      setDraggedFolderId(null);
++      setDragOverFolderId(null);
++      return;
++    }
++    const siblings = isTargetRoot ? rootFolders : getChildFolders(targetFolder.parentId);
++    const siblingIds = siblings.map((f) => f.id);
++    const fromIdx = siblingIds.indexOf(draggedFolderId);
++    const toIdx = siblingIds.indexOf(targetFolder.id);
++    if (fromIdx !== -1 && toIdx !== -1) {
++      const reordered = [...siblingIds];
++      reordered.splice(fromIdx, 1);
++      reordered.splice(toIdx, 0, draggedFolderId);
++      reorderFolders(reordered);
++    }
++    setDraggedFolderId(null);
++    setDragOverFolderId(null);
++  }
+ 
+   function toggleRootExpanded(id) {
+     setExpandedRootIds((prev) => ({ ...prev, [id]: !prev[id] }));
+@@ -168,10 +205,17 @@ export function Sidebar({ fontScale }) {
+     return (
+       <div key={folder.id}>
+         <div
++          draggable
++          onDragStart={(e) => { setDraggedFolderId(folder.id); e.dataTransfer.effectAllowed = 'move'; }}
++          onDragOver={(e) => { e.preventDefault(); if (draggedFolderId && draggedFolderId !== folder.id) setDragOverFolderId(folder.id); }}
++          onDragLeave={() => setDragOverFolderId((prev) => (prev === folder.id ? null : prev))}
++          onDrop={(e) => { e.preventDefault(); handleFolderDrop(folder, isRoot); }}
++          onDragEnd={() => { setDraggedFolderId(null); setDragOverFolderId(null); }}
+           style={{
+-            display: 'flex', alignItems: 'center',
+-            background: isActive ? 'var(--accent-light)' : 'none',
+-            borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
++            display: 'flex', alignItems: 'center', cursor: 'grab',
++            background: isActive ? 'var(--accent-light)' : dragOverFolderId === folder.id ? 'var(--surface2)' : 'none',
++            borderInlineStart: `2px solid ${isActive ? 'var(--accent)' : dragOverFolderId === folder.id ? 'var(--accent)' : 'transparent'}`,
++            opacity: draggedFolderId === folder.id ? 0.4 : 1,
+             transition: 'background .12s',
+           }}
+           onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface2)'; }}
+diff --git a/src/real-styles.css b/src/real-styles.css
+index 5d942e8..9e188e6 100644
+--- a/src/real-styles.css
++++ b/src/real-styles.css
+@@ -221,12 +221,11 @@ mark {
+ .btn-primary:hover { opacity: .88; }
+ .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+ 
+-/* نصوص اسم/ملاحظة التاسك بصفوف الجدول — بطلب صريح: بحد أقصى سطرين (بدل سطر
+-   وحد مقصوص) على الشاشات الكبيرة، مع "..." بنهاية السطر الثاني لو النص أطول.
+-   يطبَّق تلقائياً على كل تاسك يستخدم هذي الأصناف — شخصي وورك سبيس معاً (TaskRow،
+-   FolderTaskRow، WorkspaceTaskRow) بما إنها كلها تشترك بنفس الأصناف. كسر كلام
+-   كامل بدون قصّ يبقى كما هو على الموبايل (media query أدناه، غير محدود بعمد —
+-   مساحة كافية بالتصميم المكدَّس عمودياً هناك). */
++/* نصوص اسم/ملاحظة التاسك بصفوف الجدول — بطلب صريح: بحد أقصى سطرين مع "..."
++   لو النص أطول، **و**ارتفاع ثابت يعادل سطرين دايماً (حتى لو النص سطر وحد قصير)
++   — عشان كل الصفوف تطلع بنفس الارتفاع بالضبط، مو ارتفاع متغيّر حسب طول النص.
++   يطبَّق تلقائياً على كل تاسك شخصي وورك سبيس (TaskRow، FolderTaskRow،
++   WorkspaceTaskRow — كلها تشترك بنفس الأصناف). */
+ .task-name-text, .task-note-text {
+   display: -webkit-box;
+   -webkit-line-clamp: 2;
+@@ -234,6 +233,8 @@ mark {
+   overflow: hidden;
+   overflow-wrap: break-word;
+   word-break: break-word;
++  min-height: calc(1.4em * 2);
++  line-height: 1.4;
+ }
+ 
+ /* صف البحث/الفلاتر/الترتيب بصفحة تفاصيل الورك سبيس: على شاشات ضيقة، البحث ينزل
+diff --git a/src/services/foldersService.js b/src/services/foldersService.js
+index 10c5c34..896b7da 100644
+--- a/src/services/foldersService.js
++++ b/src/services/foldersService.js
+@@ -2,11 +2,15 @@
+ // خدمة المجلدات (Folders) — مسار التخزين: users/{uid}/folders/{folderId}
+ // نسخة مُعاد كتابتها بوضوح من المتغير `ge` بالكود الأصلي المضغوط.
+ 
+-import { saveUserDoc, deleteUserDoc, onUserCollection } from './userScopedCrud';
++import { saveUserDoc, updateUserDoc, deleteUserDoc, onUserCollection } from './userScopedCrud';
+ 
+ export const foldersService = {
+   save: (uid, folder) => saveUserDoc(uid, 'folders', folder.id, folder),
+ 
++  // ⚠️ إضافة بطلب صريح (لازمة لحفظ ترتيب السحب-والإفلات فوراً بـFirestore) —
++  // نفس نمط tasksService.update، تحديث جزئي بدل استبدال كامل.
++  update: (uid, folderId, partialData) => updateUserDoc(uid, 'folders', folderId, partialData),
++
+   delete: (uid, folderId) => deleteUserDoc(uid, 'folders', folderId),
+ 
+   onFolders: (uid, callback) =>
+diff --git a/src/store/foldersStore.js b/src/store/foldersStore.js
+index f3b918a..731b0af 100644
+--- a/src/store/foldersStore.js
++++ b/src/store/foldersStore.js
+@@ -80,6 +80,35 @@ export const useFoldersStore = create(
+         }
+       },
+ 
++      /**
++       * ⚠️ إضافة جديدة بطلب صريح: يعيد ترتيب الفولدرات (سحب وإفلات) — يأخذ قائمة
++       * IDs بالترتيب الجديد (لنفس المستوى/الأب فقط)، يحدّث حقل order محلياً فوراً
++       * (استجابة لحظية بالواجهة)، وبالتوازي يحفظ order الجديد لكل فولدر تغيّر
++       * ترتيبه فعلياً بـFirestore (تحديث جزئي لحقل order بس + إعادة محاولة، نفس
++       * نمط باقي الكتابات الآمنة بالتطبيق — ما يلمس أي حقل ثاني بالفولدر).
++       */
++      reorderFolders: (orderedIds) => {
++        const uid = useAuthStore.getState().user?.uid;
++        const before = get().folders;
++
++        set((state) => ({
++          folders: state.folders.map((f) => {
++            const newOrder = orderedIds.indexOf(f.id);
++            return newOrder === -1 ? f : { ...f, order: newOrder };
++          }),
++        }));
++
++        if (!uid || _disableFirestoreSyncForTesting) return;
++
++        orderedIds.forEach((id, newOrder) => {
++          const original = before.find((f) => f.id === id);
++          if (!original || original.order === newOrder) return; // ما تغيّر ترتيبه فعلياً — تجاهله، صفر كتابة زايدة
++          retryFirestoreWrite(() => foldersService.update(uid, id, { order: newOrder }), {
++            onFinalFailure: () => showToast(`Couldn't save the new folder order — check your connection and try again`, 'error'),
++          });
++        });
++      },
++
+       /**
+        * ينقل تاسك لمجلد آخر (نقل بسيط لحقل folderId). لا تلمس Firestore الخاصة
+        * بالمجلد نفسه — التاسك يُحدَّث عن طريق tasksStore.updateTask من الطبقة
+diff --git a/src/utils/useIdleScreensaver.js b/src/utils/useIdleScreensaver.js
+index 0d7e130..14a7434 100644
+--- a/src/utils/useIdleScreensaver.js
++++ b/src/utils/useIdleScreensaver.js
+@@ -33,6 +33,15 @@ const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
+ const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
+ const BRAND_STORAGE_KEY = 'priora_screensaver_brand';
+ const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
++const PREVIEW_TRIGGER_EVENT = 'priora-screensaver-preview-trigger';
++
++// ⚠️ إضافة جديدة بطلب صريح: تشغيل شاشة التوقف فوراً للمعاينة (زر بالإعدادات)،
++// بدون انتظار مدة الخمول الفعلية. نفس نمط أحداث النافذة (window Event) المستخدم
++// أصلاً لمزامنة الإعدادات — أبسط طريقة توصل من SettingsModal (مودال منفصل) لهذا
++// الـhook (شغّال بـApp.jsx بمستوى أعلى) بدون تمرير props عبر طبقات كثيرة.
++export function triggerScreensaverPreview() {
++  window.dispatchEvent(new Event(PREVIEW_TRIGGER_EVENT));
++}
+ 
+ export function getScreensaverEnabled() {
+   if (typeof localStorage === 'undefined') return true;
+@@ -139,6 +148,18 @@ export function useIdleScreensaver() {
+     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
+   }, []);
+ 
++  // ⚠️ إضافة جديدة بطلب صريح: يشغّل شاشة التوقف فوراً لما يوصل حدث المعاينة —
++  // بغض النظر عن مؤقّت الخمول الحالي (ما يلغيه ولا يوقفه، بس يعرض الشاشة الآن
++  // بالإضافة). الإغلاق بنفس طريقة العرض العادي (نقرة على الشاشة نفسها).
++  useEffect(() => {
++    function handlePreviewTrigger() {
++      isActiveRef.current = true;
++      setIsActive(true);
++    }
++    window.addEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
++    return () => window.removeEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
++  }, []);
++
+   function resetTimer() {
+     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+     if (!enabled) return;
