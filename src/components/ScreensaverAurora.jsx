@@ -20,10 +20,17 @@ export function ScreensaverAurora({ onDismiss, caption, brand }) {
         cursor: 'pointer', overflow: 'hidden', animation: 'fade-in .6s ease',
       }}
     >
-      <div style={{ position: 'absolute', inset: '-20%', filter: 'blur(60px)', opacity: .35 }}>
-        <div style={{ position: 'absolute', width: '60%', height: '60%', left: '5%', top: '10%', background: 'radial-gradient(circle, #4f7cff, transparent 70%)', animation: 'priora-aurora-drift-1 27s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', width: '50%', height: '50%', left: '45%', top: '40%', background: 'radial-gradient(circle, #7d5fff, transparent 70%)', animation: 'priora-aurora-drift-2 33s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', width: '45%', height: '45%', left: '20%', top: '55%', background: 'radial-gradient(circle, #2fd4c9, transparent 70%)', animation: 'priora-aurora-drift-3 39s ease-in-out infinite' }} />
+      {/* ⚠️ تصحيح خلل حقيقي بطلب صريح ("متجانسة، ما يبين فيها بقع"): كانت الكتل
+          الثلاث واضحة كدوائر منفصلة رغم الـblur — السبب: blur خفيف نسبياً (60px)
+          + مساحات تراكب قليلة + خلط ألوان عادي (كل كتلة ترسم فوق الثانية بشكل
+          طبيعي، حواف واضحة عند التقاطع). الحل: blur أقوى بكثير (130px) + تراكب
+          أكبر بين الكتل (أحجام أكبر ومواضع أقرب من بعض) + mix-blend-mode:screen
+          (يخلط الألوان المتراكبة زي الضوء الحقيقي، بدون حواف صلبة) — نفس الألوان
+          الأساسية بالضبط (أزرق/بنفسجي/فيروزي)، بس تركيبة مدموجة مو بقع منفصلة. */}
+      <div style={{ position: 'absolute', inset: '-30%', filter: 'blur(130px)', opacity: .5 }}>
+        <div style={{ position: 'absolute', width: '75%', height: '75%', left: '2%', top: '5%', background: 'radial-gradient(circle, #4f7cff, transparent 70%)', mixBlendMode: 'screen', animation: 'priora-aurora-drift-1 27s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', width: '68%', height: '68%', left: '38%', top: '32%', background: 'radial-gradient(circle, #7d5fff, transparent 70%)', mixBlendMode: 'screen', animation: 'priora-aurora-drift-2 33s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', width: '62%', height: '62%', left: '18%', top: '42%', background: 'radial-gradient(circle, #2fd4c9, transparent 70%)', mixBlendMode: 'screen', animation: 'priora-aurora-drift-3 39s ease-in-out infinite' }} />
       </div>
 
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
