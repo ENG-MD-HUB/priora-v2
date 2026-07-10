@@ -4,13 +4,11 @@
 // الفردي (ownerId === currentUser)، وليس لكل أعضاء الورك سبيس.
 
 import { useAuthStore } from '../store/authStore';
-import { useTasksStore } from '../store/tasksStore';
 import { isTaskOverdue, daysSince, wasUpdatedToday, formatDateForDisplay, isToday } from '../utils/taskDateLogic';
 import { getDaysSinceColor, getFollowupDateColor } from '../utils/taskColors';
 import { highlightMatch } from '../utils/highlightMatch';
-import { wsTaskService } from '../services/wsTaskService';
-import { tasksService } from '../services/tasksService';
 import { showToast } from '../store/toastStore';
+import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
 
 export const WS_TASK_ROW_GRID_COLUMNS = 'minmax(180px,2.5fr) minmax(160px,3fr) 120px 130px 150px 110px';
 const STATUS_LABELS = { active: 'Action Required', waiting: 'Waiting', ontrack: 'On Track', closed: 'Closed' };
@@ -28,25 +26,24 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
   const highlightedNote = searchQ ? highlightMatch(latestNote, searchQ) : undefined;
 
   // ⚠️ إضافة بطلب صريح: زر "Complete" ما كان موجود بجدول تاسكات الورك سبيس
-  // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow). النقر يُغلق
-  // التاسك بنسخة الورك سبيس دائماً، وبالإضافة — لو هذا تاسك شخصي مُشارَك
-  // (workspaceId === null) والمستخدم الحالي هو مالكه — يُحدَّث المصدر الشخصي
-  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal.
+  // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow).
   //
-  // ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة (بالنسختين)
-  // save كامل للتاسك — الآن تحديث جزئي لحقل status بس، فما يقدر يمسح أي حقل ثاني
-  // (زي timeline) تغيّر بمكان آخر بنفس اللحظة تقريباً.
+  // ⚠️ تصحيح خلل حقيقي (بعد اكتشاف مسار مكرر — قائمة الزر اليمين وزر Re-open
+  // كان عندهم نفس المشكلة الأصلية رغم إصلاحها هنا): الدالة صارت تستخدم
+  // applyWsTaskChangeAndSyncPersonal المشتركة (تحديث جزئي + retry + فحص تعارض +
+  // مزامنة شخصية) بدل تكرار نفس المنطق يدوياً بكل مكان لحاله.
   function handleComplete() {
-    wsTaskService.update(wsId, task.id, { status: 'closed' }).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
+    applyWsTaskChangeAndSyncPersonal(task, wsId, { status: 'closed' })
+      .then(() => showToast('Task completed'))
+      .catch((err) => console.warn('ws complete:', err));
+  }
 
-    if (task.workspaceId === null && task.ownerId === user?.uid) {
-      useTasksStore.setState((state) => ({
-        tasks: state.tasks.some((t) => t.id === task.id)
-          ? state.tasks.map((t) => (t.id === task.id ? { ...t, status: 'closed' } : t))
-          : state.tasks,
-      }));
-      tasksService.update(user.uid, task.id, { status: 'closed' }).catch((err) => console.warn('personal sync:', err));
-    }
+  // ⚠️ نفس تصحيح handleComplete بالضبط — كان يستخدم wsTaskService.save (استبدال
+  // كامل، بدون مزامنة شخصية ولا إعادة محاولة) قبل هذا الإصلاح.
+  function handleReopen() {
+    applyWsTaskChangeAndSyncPersonal(task, wsId, { status: 'active' })
+      .then(() => showToast('Reopened'))
+      .catch((err) => console.warn('ws reopen:', err));
   }
 
   return (
@@ -92,7 +89,7 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
         {task.status === 'closed' ? (
           isOwner && (
             <button
-              onClick={(e) => { e.stopPropagation(); wsTaskService.save(wsId, { ...task, status: 'active' }).then(() => showToast('Reopened')); }}
+              onClick={(e) => { e.stopPropagation(); handleReopen(); }}
               style={{ padding: '4px 9px', background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 5, fontFamily: 'var(--font)', fontSize: 11, cursor: 'pointer' }}
             >
               Re-open

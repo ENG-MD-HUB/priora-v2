@@ -1,0 +1,317 @@
+diff --git a/src/components/WorkspaceDetailPage.jsx b/src/components/WorkspaceDetailPage.jsx
+index c0ec32e..aaf1fec 100644
+--- a/src/components/WorkspaceDetailPage.jsx
++++ b/src/components/WorkspaceDetailPage.jsx
+@@ -11,6 +11,7 @@ import { useAuthStore } from '../store/authStore';
+ import { useWorkspacesStore } from '../store/workspacesStore';
+ import { useTasksStore } from '../store/tasksStore';
+ import { wsTaskService } from '../services/wsTaskService';
++import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
+ import { useWorkspaceTasks } from '../utils/useWorkspaceTasks';
+ import { useWorkspaceMembers } from '../utils/useWorkspaceMembers';
+ import { sortTasks } from '../utils/sortTasks';
+@@ -265,11 +266,11 @@ export function WorkspaceDetailPage({ ws, onBack, onSwitch, initialDetailTaskId,
+           onDetail={() => { setDetailTask(ctxMenu.task); setCtxMenu(null); }}
+           onToggleUrgent={async () => {
+             const task = ctxMenu.task;
+-            await wsTaskService.save(ws.id, { ...task, priority: task.priority === 'urgent' ? 'normal' : 'urgent' });
++            await applyWsTaskChangeAndSyncPersonal(task, ws.id, { priority: task.priority === 'urgent' ? 'normal' : 'urgent' });
+             setCtxMenu(null);
+           }}
+           onComplete={async () => {
+-            await wsTaskService.save(ws.id, { ...ctxMenu.task, status: 'closed' });
++            await applyWsTaskChangeAndSyncPersonal(ctxMenu.task, ws.id, { status: 'closed' });
+             setCtxMenu(null);
+           }}
+           onDelete={() => { setDeletingTask(ctxMenu.task); setCtxMenu(null); }}
+diff --git a/src/components/WorkspaceTaskEditModal.jsx b/src/components/WorkspaceTaskEditModal.jsx
+index c171e21..43fe3fe 100644
+--- a/src/components/WorkspaceTaskEditModal.jsx
++++ b/src/components/WorkspaceTaskEditModal.jsx
+@@ -5,9 +5,9 @@
+ 
+ import { useState } from 'react';
+ import { Modal } from './Modal';
+-import { wsTaskService } from '../services/wsTaskService';
+ import { showToast } from '../store/toastStore';
+ import { getEffectiveToday } from '../utils/taskDateLogic';
++import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
+ 
+ export function WorkspaceTaskEditModal({ task, wsId, onClose }) {
+   const [name, setName] = useState(task.name);
+@@ -17,13 +17,16 @@ export function WorkspaceTaskEditModal({ task, wsId, onClose }) {
+   const [followupDate, setFollowupDate] = useState(task.nextFollowup ?? '');
+   const [saving, setSaving] = useState(false);
+ 
++  // ⚠️ تصحيح خلل حقيقي (نفس فئة "المسار المكرر" بالضبط): كانت wsTaskService.save
++  // — استبدال كامل لنسخة الورك سبيس، بدون أي مزامنة للمصدر الشخصي إطلاقاً. الآن
++  // تحديث جزئي (الحقول المتغيّرة فقط) + مزامنة آمنة (retry + فحص تعارض) عبر
++  // applyWsTaskChangeAndSyncPersonal المشتركة.
+   async function handleSubmit(e) {
+     e.preventDefault();
+     if (!name.trim()) return;
+     setSaving(true);
+     try {
+-      await wsTaskService.save(wsId, {
+-        ...task,
++      await applyWsTaskChangeAndSyncPersonal(task, wsId, {
+         name: name.trim(),
+         desc: desc.trim(),
+         status,
+diff --git a/src/components/WorkspaceTaskRow.jsx b/src/components/WorkspaceTaskRow.jsx
+index e09e669..5afe90b 100644
+--- a/src/components/WorkspaceTaskRow.jsx
++++ b/src/components/WorkspaceTaskRow.jsx
+@@ -4,13 +4,11 @@
+ // الفردي (ownerId === currentUser)، وليس لكل أعضاء الورك سبيس.
+ 
+ import { useAuthStore } from '../store/authStore';
+-import { useTasksStore } from '../store/tasksStore';
+ import { isTaskOverdue, daysSince, wasUpdatedToday, formatDateForDisplay, isToday } from '../utils/taskDateLogic';
+ import { getDaysSinceColor, getFollowupDateColor } from '../utils/taskColors';
+ import { highlightMatch } from '../utils/highlightMatch';
+-import { wsTaskService } from '../services/wsTaskService';
+-import { tasksService } from '../services/tasksService';
+ import { showToast } from '../store/toastStore';
++import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
+ 
+ export const WS_TASK_ROW_GRID_COLUMNS = 'minmax(180px,2.5fr) minmax(160px,3fr) 120px 130px 150px 110px';
+ const STATUS_LABELS = { active: 'Action Required', waiting: 'Waiting', ontrack: 'On Track', closed: 'Closed' };
+@@ -28,25 +26,24 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+   const highlightedNote = searchQ ? highlightMatch(latestNote, searchQ) : undefined;
+ 
+   // ⚠️ إضافة بطلب صريح: زر "Complete" ما كان موجود بجدول تاسكات الورك سبيس
+-  // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow). النقر يُغلق
+-  // التاسك بنسخة الورك سبيس دائماً، وبالإضافة — لو هذا تاسك شخصي مُشارَك
+-  // (workspaceId === null) والمستخدم الحالي هو مالكه — يُحدَّث المصدر الشخصي
+-  // مباشرة بنفس الطريقة المستخدمة بـWorkspaceTaskUpdateModal.
++  // إطلاقاً (موجود فقط بجدول التاسكات الشخصية عبر FolderTaskRow).
+   //
+-  // ⚠️ تصحيح خلل حقيقي (بعد حادثة فقدان بيانات فعلية): كانت الكتابة (بالنسختين)
+-  // save كامل للتاسك — الآن تحديث جزئي لحقل status بس، فما يقدر يمسح أي حقل ثاني
+-  // (زي timeline) تغيّر بمكان آخر بنفس اللحظة تقريباً.
++  // ⚠️ تصحيح خلل حقيقي (بعد اكتشاف مسار مكرر — قائمة الزر اليمين وزر Re-open
++  // كان عندهم نفس المشكلة الأصلية رغم إصلاحها هنا): الدالة صارت تستخدم
++  // applyWsTaskChangeAndSyncPersonal المشتركة (تحديث جزئي + retry + فحص تعارض +
++  // مزامنة شخصية) بدل تكرار نفس المنطق يدوياً بكل مكان لحاله.
+   function handleComplete() {
+-    wsTaskService.update(wsId, task.id, { status: 'closed' }).then(() => showToast('Task completed')).catch((err) => console.warn('ws complete:', err));
++    applyWsTaskChangeAndSyncPersonal(task, wsId, { status: 'closed' })
++      .then(() => showToast('Task completed'))
++      .catch((err) => console.warn('ws complete:', err));
++  }
+ 
+-    if (task.workspaceId === null && task.ownerId === user?.uid) {
+-      useTasksStore.setState((state) => ({
+-        tasks: state.tasks.some((t) => t.id === task.id)
+-          ? state.tasks.map((t) => (t.id === task.id ? { ...t, status: 'closed' } : t))
+-          : state.tasks,
+-      }));
+-      tasksService.update(user.uid, task.id, { status: 'closed' }).catch((err) => console.warn('personal sync:', err));
+-    }
++  // ⚠️ نفس تصحيح handleComplete بالضبط — كان يستخدم wsTaskService.save (استبدال
++  // كامل، بدون مزامنة شخصية ولا إعادة محاولة) قبل هذا الإصلاح.
++  function handleReopen() {
++    applyWsTaskChangeAndSyncPersonal(task, wsId, { status: 'active' })
++      .then(() => showToast('Reopened'))
++      .catch((err) => console.warn('ws reopen:', err));
+   }
+ 
+   return (
+@@ -92,7 +89,7 @@ export function WorkspaceTaskRow({ task, wsId, searchQ, onCtx, onUpdate, onDetai
+         {task.status === 'closed' ? (
+           isOwner && (
+             <button
+-              onClick={(e) => { e.stopPropagation(); wsTaskService.save(wsId, { ...task, status: 'active' }).then(() => showToast('Reopened')); }}
++              onClick={(e) => { e.stopPropagation(); handleReopen(); }}
+               style={{ padding: '4px 9px', background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 5, fontFamily: 'var(--font)', fontSize: 11, cursor: 'pointer' }}
+             >
+               Re-open
+diff --git a/src/store/contactsStore.js b/src/store/contactsStore.js
+index d1a9b20..a3f206a 100644
+--- a/src/store/contactsStore.js
++++ b/src/store/contactsStore.js
+@@ -18,6 +18,8 @@ import { useAuthStore } from './authStore';
+ import { contactsService } from '../services/contactsService';
+ import { generateId } from '../utils/generateId';
+ import { buildStorageKey } from '../utils/anonUserTracking';
++import { retryFirestoreWrite } from '../utils/retryFirestoreWrite';
++import { showToast } from './toastStore';
+ 
+ // ⚠️ علم اختباري فقط (مو موجود بالكود الأصلي): يسمح لصفحة الاختبار (TestHarness)
+ // بتعطيل مزامنة Firestore الفعلية، لتفادي نفس مشكلة "التعليق" المكتشفة بقسم
+@@ -33,6 +35,8 @@ export const useContactsStore = create(
+     (set, get) => ({
+       contacts: [],
+ 
++      // ⚠️ تصحيح: إعادة محاولة + تحذير بدل fire-and-forget صامت — نفس نمط
++      // إصلاحات الفولدرات/التاسكات بعد حادثة فقدان بيانات فعلية.
+       addContact: (data) => {
+         const newContact = {
+           id: generateId(),
+@@ -45,7 +49,9 @@ export const useContactsStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          contactsService.save(uid, newContact).catch(console.error);
++          retryFirestoreWrite(() => contactsService.save(uid, newContact), {
++            onFinalFailure: () => showToast(`Couldn't save "${newContact.name}" — check your connection and try again`, 'error'),
++          });
+         }
+ 
+         return newContact;
+@@ -59,16 +65,23 @@ export const useContactsStore = create(
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+           const merged = get().contacts.find((c) => c.id === id);
+-          if (merged) contactsService.save(uid, merged).catch(console.error);
++          if (merged) {
++            retryFirestoreWrite(() => contactsService.save(uid, merged), {
++              onFinalFailure: () => showToast(`Couldn't save changes to "${merged.name}" — check your connection and try again`, 'error'),
++            });
++          }
+         }
+       },
+ 
+       deleteContact: (id) => {
++        const contact = get().contacts.find((c) => c.id === id);
+         set((state) => ({ contacts: state.contacts.filter((c) => c.id !== id) }));
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          contactsService.delete(uid, id).catch(console.error);
++          retryFirestoreWrite(() => contactsService.delete(uid, id), {
++            onFinalFailure: () => showToast(`Couldn't fully delete "${contact?.name ?? 'contact'}" — check your connection and try again`, 'error'),
++          });
+         }
+       },
+     }),
+diff --git a/src/store/foldersStore.js b/src/store/foldersStore.js
+index de251f4..f3b918a 100644
+--- a/src/store/foldersStore.js
++++ b/src/store/foldersStore.js
+@@ -56,7 +56,9 @@ export const useFoldersStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          foldersService.save(uid, newFolder).catch(console.error);
++          retryFirestoreWrite(() => foldersService.save(uid, newFolder), {
++            onFinalFailure: () => showToast(`Couldn't save "${newFolder.name}" — check your connection and try again`, 'error'),
++          });
+         }
+ 
+         return newFolder;
+@@ -70,7 +72,11 @@ export const useFoldersStore = create(
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+           const merged = get().folders.find((f) => f.id === id);
+-          if (merged) foldersService.save(uid, merged).catch(console.error);
++          if (merged) {
++            retryFirestoreWrite(() => foldersService.save(uid, merged), {
++              onFinalFailure: () => showToast(`Couldn't save changes to "${merged.name}" — check your connection and try again`, 'error'),
++            });
++          }
+         }
+       },
+ 
+@@ -140,8 +146,10 @@ export const useFoldersStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          foldersService.save(uid, restoredFolder).catch(console.error);
+-          deletedFoldersService.delete(uid, id).catch(console.error);
++          retryFirestoreWrite(() => foldersService.save(uid, restoredFolder), {
++            onFinalFailure: () => showToast(`Couldn't restore "${restoredFolder.name}" — check your connection and try again`, 'error'),
++          });
++          retryFirestoreWrite(() => deletedFoldersService.delete(uid, id));
+         }
+ 
+         return restoredFolder;
+@@ -155,7 +163,9 @@ export const useFoldersStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && !_disableFirestoreSyncForTesting) {
+-          deletedFoldersService.delete(uid, id).catch(console.error);
++          retryFirestoreWrite(() => deletedFoldersService.delete(uid, id), {
++            onFinalFailure: () => showToast(`Couldn't permanently delete the folder — check your connection and try again`, 'error'),
++          });
+         }
+       },
+ 
+diff --git a/src/store/tasksStore.js b/src/store/tasksStore.js
+index 3ed919f..314ad22 100644
+--- a/src/store/tasksStore.js
++++ b/src/store/tasksStore.js
+@@ -62,7 +62,9 @@ export const useTasksStore = create(
+ 
+         const uid = useAuthStore.getState().user?.uid;
+         if (uid && newTask.workspaceId === null && !_disableFirestoreSyncForTesting) {
+-          tasksService.save(uid, newTask).catch(console.error);
++          retryFirestoreWrite(() => tasksService.save(uid, newTask), {
++            onFinalFailure: () => showToast(`Couldn't save "${newTask.name}" — check your connection and try again`, 'error'),
++          });
+         }
+ 
+         return newTask;
+@@ -157,7 +159,9 @@ export const useTasksStore = create(
+           retryFirestoreWrite(() => tasksService.delete(uid, id), {
+             onFinalFailure: () => showToast(`Couldn't fully delete "${original.name}" — check your connection and try again`, 'error'),
+           });
+-          trashService.save(uid, trashedTask).catch(console.error);
++          retryFirestoreWrite(() => trashService.save(uid, trashedTask), {
++            onFinalFailure: () => showToast(`"${original.name}" was removed but couldn't be moved to Trash — check your connection`, 'error'),
++          });
+         }
+ 
+         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
+diff --git a/src/utils/applyWsTaskChange.js b/src/utils/applyWsTaskChange.js
+new file mode 100644
+index 0000000..1eb4cc6
+--- /dev/null
++++ b/src/utils/applyWsTaskChange.js
+@@ -0,0 +1,45 @@
++// applyWsTaskChange.js
++// ⚠️ إضافة جديدة بطلب صريح: دالة موحّدة لتطبيق أي تعديل على نسخة تاسك بالورك
++// سبيس، مع مزامنة آمنة للمصدر الشخصي (لو ينطبق). السبب: نفس منطق "زامن للمصدر
++// الشخصي" كان مكرر بعدة أماكن (WorkspaceTaskUpdateModal، WorkspaceTaskDetailModal،
++// WorkspaceTaskRow) — وكل مرة نصلحه بمكان، ينسى بمكان ثاني (بالضبط اللي صار مع
++// قائمة الزر اليمين وزر Re-open). دالة واحدة مشتركة تمنع تكرار هذا مستقبلاً.
++//
++// تستخدم:
++// - wsTaskService.update (تحديث جزئي، مو استبدال كامل) لنسخة الورك سبيس.
++// - tasksService.updateIfNotStale (فحص تعارض + retry) للمصدر الشخصي، لو التاسك
++//   أصله شخصي مشارك (workspaceId === null) والمستخدم الحالي هو مالكه.
++
++import { useTasksStore } from '../store/tasksStore';
++import { useAuthStore } from '../store/authStore';
++import { tasksService } from '../services/tasksService';
++import { wsTaskService } from '../services/wsTaskService';
++import { retryFirestoreWrite } from './retryFirestoreWrite';
++import { showToast } from '../store/toastStore';
++
++export async function applyWsTaskChangeAndSyncPersonal(task, wsId, changedFields) {
++  await wsTaskService.update(wsId, task.id, changedFields);
++
++  const user = useAuthStore.getState().user;
++  if (task.workspaceId !== null || !user || task.ownerId !== user.uid) return;
++
++  const uid = user.uid;
++  retryFirestoreWrite(
++    async () => {
++      const result = await tasksService.updateIfNotStale(uid, task.id, changedFields, task._syncTs);
++      if (result.conflict) {
++        useTasksStore.setState((state) => ({
++          tasks: state.tasks.map((t) => (t.id === task.id ? { ...t, _conflictPending: true } : t)),
++        }));
++        showToast(`"${task.name}" was updated elsewhere — showing you the latest version`, 'error');
++      } else {
++        useTasksStore.setState((state) => ({
++          tasks: state.tasks.some((t) => t.id === task.id)
++            ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields, _conflictPending: false } : t))
++            : state.tasks,
++        }));
++      }
++    },
++    { onFinalFailure: () => showToast(`Couldn't save changes to "${task.name}" — check your connection and try again`, 'error') }
++  );
++}

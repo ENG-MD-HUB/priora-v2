@@ -54,7 +54,9 @@ export const useFoldersStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && !_disableFirestoreSyncForTesting) {
-          foldersService.save(uid, newFolder).catch(console.error);
+          retryFirestoreWrite(() => foldersService.save(uid, newFolder), {
+            onFinalFailure: () => showToast(`Couldn't save "${newFolder.name}" — check your connection and try again`, 'error'),
+          });
         }
 
         return newFolder;
@@ -68,7 +70,11 @@ export const useFoldersStore = create(
         const uid = useAuthStore.getState().user?.uid;
         if (uid && !_disableFirestoreSyncForTesting) {
           const merged = get().folders.find((f) => f.id === id);
-          if (merged) foldersService.save(uid, merged).catch(console.error);
+          if (merged) {
+            retryFirestoreWrite(() => foldersService.save(uid, merged), {
+              onFinalFailure: () => showToast(`Couldn't save changes to "${merged.name}" — check your connection and try again`, 'error'),
+            });
+          }
         }
       },
 
@@ -132,8 +138,10 @@ export const useFoldersStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && !_disableFirestoreSyncForTesting) {
-          foldersService.save(uid, restoredFolder).catch(console.error);
-          deletedFoldersService.delete(uid, id).catch(console.error);
+          retryFirestoreWrite(() => foldersService.save(uid, restoredFolder), {
+            onFinalFailure: () => showToast(`Couldn't restore "${restoredFolder.name}" — check your connection and try again`, 'error'),
+          });
+          retryFirestoreWrite(() => deletedFoldersService.delete(uid, id));
         }
 
         return restoredFolder;
@@ -147,7 +155,9 @@ export const useFoldersStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && !_disableFirestoreSyncForTesting) {
-          deletedFoldersService.delete(uid, id).catch(console.error);
+          retryFirestoreWrite(() => deletedFoldersService.delete(uid, id), {
+            onFinalFailure: () => showToast(`Couldn't permanently delete the folder — check your connection and try again`, 'error'),
+          });
         }
       },
 

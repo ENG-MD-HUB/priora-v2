@@ -62,7 +62,9 @@ export const useTasksStore = create(
 
         const uid = useAuthStore.getState().user?.uid;
         if (uid && newTask.workspaceId === null && !_disableFirestoreSyncForTesting) {
-          tasksService.save(uid, newTask).catch(console.error);
+          retryFirestoreWrite(() => tasksService.save(uid, newTask), {
+            onFinalFailure: () => showToast(`Couldn't save "${newTask.name}" — check your connection and try again`, 'error'),
+          });
         }
 
         return newTask;
@@ -157,7 +159,9 @@ export const useTasksStore = create(
           retryFirestoreWrite(() => tasksService.delete(uid, id), {
             onFinalFailure: () => showToast(`Couldn't fully delete "${original.name}" — check your connection and try again`, 'error'),
           });
-          trashService.save(uid, trashedTask).catch(console.error);
+          retryFirestoreWrite(() => trashService.save(uid, trashedTask), {
+            onFinalFailure: () => showToast(`"${original.name}" was removed but couldn't be moved to Trash — check your connection`, 'error'),
+          });
         }
 
         if ((original.sharedToWsIds ?? []).length > 0 && !_disableFirestoreSyncForTesting) {
