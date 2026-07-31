@@ -11,7 +11,6 @@ import { useAuthStore } from '../store/authStore';
 import { useWorkspacesStore } from '../store/workspacesStore';
 import { useTasksStore } from '../store/tasksStore';
 import { wsTaskService } from '../services/wsTaskService';
-import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
 import { useWorkspaceTasks } from '../utils/useWorkspaceTasks';
 import { useWorkspaceMembers } from '../utils/useWorkspaceMembers';
 import { sortTasks } from '../utils/sortTasks';
@@ -266,11 +265,11 @@ export function WorkspaceDetailPage({ ws, onBack, onSwitch, initialDetailTaskId,
           onDetail={() => { setDetailTask(ctxMenu.task); setCtxMenu(null); }}
           onToggleUrgent={async () => {
             const task = ctxMenu.task;
-            await applyWsTaskChangeAndSyncPersonal(task, ws.id, { priority: task.priority === 'urgent' ? 'normal' : 'urgent' });
+            await wsTaskService.save(ws.id, { ...task, priority: task.priority === 'urgent' ? 'normal' : 'urgent' });
             setCtxMenu(null);
           }}
           onComplete={async () => {
-            await applyWsTaskChangeAndSyncPersonal(ctxMenu.task, ws.id, { status: 'closed' });
+            await wsTaskService.save(ws.id, { ...ctxMenu.task, status: 'closed' });
             setCtxMenu(null);
           }}
           onDelete={() => { setDeletingTask(ctxMenu.task); setCtxMenu(null); }}

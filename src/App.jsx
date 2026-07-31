@@ -26,15 +26,11 @@ import { contactsService } from './services/contactsService';
 import { trashService } from './services/trashService';
 import { useFollowupDesktopNotifications } from './utils/useFollowupDesktopNotifications';
 import { useWorkspaceFollowupNotifications } from './utils/useWorkspaceFollowupNotifications';
-import { repairZombieItems } from './utils/repairZombieItems';
-import './utils/diagnoseSharedTasks';
 import { useFontScale } from './utils/useFontScale';
 import { useIdleScreensaver } from './utils/useIdleScreensaver';
 import { Screensaver } from './components/Screensaver';
 import { ScreensaverAurora } from './components/ScreensaverAurora';
 import { ScreensaverOrbit } from './components/ScreensaverOrbit';
-import { ScreensaverWarp } from './components/ScreensaverWarp';
-import { ScreensaverGalaxy } from './components/ScreensaverGalaxy';
 import { shouldMigrateFoldersToSubfolders, runFoldersToSubfoldersMigration, markFoldersMigrated } from './utils/migrateFoldersToSubfolders';
 import { LoginScreen } from './components/LoginScreen';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -52,7 +48,7 @@ import { GlobalSearchPage } from './components/GlobalSearchPage';
 // أسماء الصفحات اللي لها محتوى خاص بها دائماً (مش خاضعة لاستبدال نتائج البحث
 // الشامل) — نسخة من المتغير Bt بالكود الأصلي.
 const VIEWS_WITH_OWN_CONTENT = ['dashboard', 'completed', 'trash', 'contacts', 'workspaces'];
-const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit, warp: ScreensaverWarp, galaxy: ScreensaverGalaxy };
+const SCREENSAVER_COMPONENTS = { starfield: Screensaver, aurora: ScreensaverAurora, orbit: ScreensaverOrbit };
 
 function AuthenticatedApp() {
   const activeView = useUIStore((s) => s.activeView);
@@ -80,10 +76,6 @@ function AuthenticatedApp() {
       // نُعيد فحص الانتهاء فوراً — بدل انتظار إعادة تحميل تالية لالتقاطه.
       useTasksStore.getState().expireTrash();
       useFoldersStore.getState().expireDeletedFolders();
-      // ⚠️ إضافة بطلب صريح (بعد اكتشاف تراكم فعلي لعناصر زومبي بعد تسجيل خروج/دخول):
-      // تنظيف تلقائي لأي عنصر موجود بنفس اللحظة بالمجموعة النشطة والمحذوفة معاً —
-      // راجع الشرح المفصّل بـrepairZombieItems.js.
-      repairZombieItems(user.uid);
     });
   }, [user?.uid]);
 
@@ -101,19 +93,8 @@ function AuthenticatedApp() {
   useEffect(() => {
     if (!user) return;
 
-    // ⚠️ تصحيح خلل حقيقي بطلب صريح: الاستماع اللحظي يستبدل كل tasks بالكامل من
-    // السيرفر بأي تحديث — كان هذا يمسح علامة _conflictPending المحلية البحتة
-    // (مو موجودة بـFirestore أصلاً) بأول حدث snapshot غير مرتبط حتى. الحل: نحافظ
-    // على العلامة لأي تاسك كانت مُعلَّمة محلياً، لحد ما تُحل فعلياً (نجاح إعادة
-    // الكتابة يمسحها من الاستور مباشرة، مو من هنا).
-    const unsubTasks = tasksService.onTasks(user.uid, (serverTasks) =>
-      useTasksStore.setState((state) => ({
-        tasks: serverTasks.map((st) => {
-          const local = state.tasks.find((t) => t.id === st.id);
-          return local?._conflictPending ? { ...st, _conflictPending: true } : st;
-        }),
-        trash: state.trash,
-      }))
+    const unsubTasks = tasksService.onTasks(user.uid, (tasks) =>
+      useTasksStore.setState((state) => ({ tasks, trash: state.trash }))
     );
     const unsubTrash = trashService.onTrash(user.uid, (trash) =>
       useTasksStore.setState((state) => ({ tasks: state.tasks, trash }))
@@ -180,7 +161,7 @@ function AuthenticatedApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 0 }}>
-      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} caption={screensaver.caption} brand={screensaver.brand} />}
+      {screensaver.isActive && <ScreensaverComponent onDismiss={screensaver.dismiss} />}
       <TopBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Sidebar fontScale={fontScale} />

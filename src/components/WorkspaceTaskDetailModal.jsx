@@ -13,7 +13,7 @@ import { useContactsStore } from '../store/contactsStore';
 import { useTasksStore } from '../store/tasksStore';
 import { wsTaskService } from '../services/wsTaskService';
 import { tasksService } from '../services/tasksService';
-import { formatDateForDisplay, getEffectiveToday } from '../utils/taskDateLogic';
+import { formatDateForDisplay } from '../utils/taskDateLogic';
 import { WorkspaceTaskUpdateModal } from './WorkspaceTaskUpdateModal';
 
 const STATUS_LABELS = { active: 'Action Required', waiting: 'Waiting Feedback', ontrack: 'On Track', closed: 'Completed' };
@@ -32,40 +32,34 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
   // ⚠️ تصحيح خلل حقيقي (نفس فئة خلل WorkspaceTaskUpdateModal بالضبط، بس هنا):
   // تعديل ملاحظة موجودة فعلاً (تصحيح تاريخ/نص) كان يحفظ نسخة الورك سبيس فقط —
   // صفر مزامنة للمصدر الشخصي حتى لو كان المستخدم الحالي هو مالك التاسك نفسه.
-  // نفس الحل: كتابة مباشرة لـFirestore الشخصي، بشرط الملكية، بدون اعتماد على
-  // الكاش المحلي.
-  //
-  // ⚠️ تصحيح خلل حقيقي إضافي (بعد حادثة فقدان بيانات فعلية): كل الكتابات هنا
-  // (نسخة الورك سبيس والمصدر الشخصي معاً) كانت setDoc/save كامل — استبدال
-  // المستند بالكامل بدل تحديث الحقول المتغيّرة فقط. الآن تحديث جزئي (timeline
-  // + lastUpdate بس) بكل مكان، فأي حقل ثاني تغيّر بمكان مختلف بنفس اللحظة
-  // تقريباً (بجهاز/جلسة أخرى) ما يُمسَح.
+  // نفس الحل: كتابة مباشرة لـFirestore الشخصي من بيانات updatedTask نفسها،
+  // بشرط الملكية، بدون اعتماد على الكاش المحلي.
   async function saveEditedEntry(entryId) {
     if (!editText.trim()) return;
-    const newTimeline = task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e));
-    const changedFields = {
-      timeline: newTimeline,
-      lastUpdate: newTimeline.reduce((max, e) => (e.date > max ? e.date : max), '') || task.lastUpdate,
+    const updatedTask = {
+      ...task,
+      timeline: task.timeline.map((e) => (e.id === entryId ? { ...e, text: editText, date: editDate } : e)),
     };
-    await wsTaskService.update(wsId, task.id, changedFields);
-    syncToPersonalSourceIfOwned(changedFields);
+    updatedTask.lastUpdate = updatedTask.timeline.reduce((max, e) => (e.date > max ? e.date : max), '') || updatedTask.lastUpdate;
+    await wsTaskService.save(wsId, updatedTask);
+    syncToPersonalSourceIfOwned(updatedTask);
     setEditingEntryId(null);
   }
 
   async function deleteEntry(entryId) {
-    const changedFields = { timeline: task.timeline.filter((e) => e.id !== entryId) };
-    await wsTaskService.update(wsId, task.id, changedFields);
-    syncToPersonalSourceIfOwned(changedFields);
+    const updatedTask = { ...task, timeline: task.timeline.filter((e) => e.id !== entryId) };
+    await wsTaskService.save(wsId, updatedTask);
+    syncToPersonalSourceIfOwned(updatedTask);
   }
 
-  function syncToPersonalSourceIfOwned(changedFields) {
-    if (task.workspaceId !== null || task.ownerId !== user?.uid) return;
+  function syncToPersonalSourceIfOwned(updatedTask) {
+    if (updatedTask.workspaceId !== null || updatedTask.ownerId !== user?.uid) return;
     useTasksStore.setState((state) => ({
-      tasks: state.tasks.some((t) => t.id === task.id)
-        ? state.tasks.map((t) => (t.id === task.id ? { ...t, ...changedFields } : t))
+      tasks: state.tasks.some((t) => t.id === updatedTask.id)
+        ? state.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
         : state.tasks,
     }));
-    tasksService.update(user.uid, task.id, changedFields).catch((err) => console.warn('personal sync:', err));
+    tasksService.save(user.uid, updatedTask).catch((err) => console.warn('personal sync:', err));
   }
 
   return (
@@ -151,7 +145,7 @@ export function WorkspaceTaskDetailModal({ task, wsId, onClose, onUpdate }) {
                     <div>
                       <textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="textarea" style={{ marginBottom: 6, minHeight: 54 }} autoFocus />
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={getEffectiveToday()} />
+                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="input" style={{ width: 140 }} min={task.createdAt.split('T')[0]} max={new Date().toISOString().split('T')[0]} />
                         <button onClick={() => saveEditedEntry(entry.id)} style={{ padding: '5px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontFamily: 'var(--font)', cursor: 'pointer' }}>Save</button>
                         <button onClick={() => setEditingEntryId(null)} className="btn-cancel" style={{ padding: '5px 9px', fontSize: 12 }}>Cancel</button>
                       </div>

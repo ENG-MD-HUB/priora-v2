@@ -20,28 +20,13 @@ import { useState, useEffect, useRef } from 'react';
 
 const DEFAULT_TIMEOUT_MINUTES = 5;
 const MIN_TIMEOUT_MINUTES = 1;
-const DEFAULT_DESIGN = 'orbit';
-const VALID_DESIGNS = ['starfield', 'aurora', 'orbit', 'warp', 'galaxy'];
-const DEFAULT_CAPTION = 'Track Everything. Forget Nothing.';
-const MAX_CAPTION_LENGTH = 80;
-const DEFAULT_BRAND = 'Developed by Mohammad M. Alamoudi';
-const MAX_BRAND_LENGTH = 60;
+const DEFAULT_DESIGN = 'starfield';
+const VALID_DESIGNS = ['starfield', 'aurora', 'orbit'];
 
 const ENABLED_STORAGE_KEY = 'priora_screensaver_enabled';
 const MINUTES_STORAGE_KEY = 'priora_screensaver_minutes';
 const DESIGN_STORAGE_KEY = 'priora_screensaver_design';
-const CAPTION_STORAGE_KEY = 'priora_screensaver_caption';
-const BRAND_STORAGE_KEY = 'priora_screensaver_brand';
 const SETTING_CHANGE_EVENT = 'priora-screensaver-setting-change';
-const PREVIEW_TRIGGER_EVENT = 'priora-screensaver-preview-trigger';
-
-// ⚠️ إضافة جديدة بطلب صريح: تشغيل شاشة التوقف فوراً للمعاينة (زر بالإعدادات)،
-// بدون انتظار مدة الخمول الفعلية. نفس نمط أحداث النافذة (window Event) المستخدم
-// أصلاً لمزامنة الإعدادات — أبسط طريقة توصل من SettingsModal (مودال منفصل) لهذا
-// الـhook (شغّال بـApp.jsx بمستوى أعلى) بدون تمرير props عبر طبقات كثيرة.
-export function triggerScreensaverPreview() {
-  window.dispatchEvent(new Event(PREVIEW_TRIGGER_EVENT));
-}
 
 export function getScreensaverEnabled() {
   if (typeof localStorage === 'undefined') return true;
@@ -86,78 +71,25 @@ export function setScreensaverDesign(design) {
   return safeDesign;
 }
 
-// ⚠️ إضافة جديدة بطلب صريح: عبارة قابلة للتخصيص تظهر أسفل شاشة التوقف (زي
-// حقوق النشر، اسم المصمم، أو أي نص آخر يختاره المستخدم) — بدل نص "Click to
-// continue" الوظيفي بس. افتراضياً شعار التطبيق نفسه (APP_TAGLINE)، قابل
-// للتعديل من الإعدادات، محفوظ بـlocalStorage مستقل.
-export function getScreensaverCaption() {
-  if (typeof localStorage === 'undefined') return DEFAULT_CAPTION;
-  const stored = localStorage.getItem(CAPTION_STORAGE_KEY);
-  return stored === null ? DEFAULT_CAPTION : stored;
-}
-
-export function setScreensaverCaption(caption) {
-  const trimmed = (caption ?? '').trim().slice(0, MAX_CAPTION_LENGTH);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(CAPTION_STORAGE_KEY, trimmed);
-    window.dispatchEvent(new Event(SETTING_CHANGE_EVENT));
-  }
-  return trimmed;
-}
-
-// ⚠️ إضافة جديدة بطلب صريح: سطر ثابت ثانٍ (أصغر، تحت العبارة الرئيسية) — عادة
-// اسم شركة/جهة، أو أي توقيع ثابت. منفصل عن العبارة الرئيسية عمداً (يقدر
-// المستخدم يخصّص الاثنين بشكل مستقل، أو يسيب أي وحدة فاضية).
-export function getScreensaverBrand() {
-  if (typeof localStorage === 'undefined') return DEFAULT_BRAND;
-  const stored = localStorage.getItem(BRAND_STORAGE_KEY);
-  return stored === null ? DEFAULT_BRAND : stored;
-}
-
-export function setScreensaverBrand(brand) {
-  const trimmed = (brand ?? '').trim().slice(0, MAX_BRAND_LENGTH);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(BRAND_STORAGE_KEY, trimmed);
-    window.dispatchEvent(new Event(SETTING_CHANGE_EVENT));
-  }
-  return trimmed;
-}
-
 export function useIdleScreensaver() {
   const [isActive, setIsActive] = useState(false);
   const [enabled, setEnabled] = useState(getScreensaverEnabled);
   const [minutes, setMinutes] = useState(getScreensaverMinutes);
   const [design, setDesign] = useState(getScreensaverDesign);
-  const [caption, setCaption] = useState(getScreensaverCaption);
-  const [brand, setBrand] = useState(getScreensaverBrand);
   const timeoutRef = useRef(null);
   const isActiveRef = useRef(false); // مرجع فوري (بدون تأخير closure) يُستخدم داخل مستمعي الأحداث
 
   // يستمع لتغيير الإعداد من SettingsModal (مودال منفصل، حالة محلية مستقلة) —
-  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم، العبارة) لا
-  // ينعكس على هذا الـhook النشط إلا بعد تحديث الصفحة كاملة.
+  // بدون هذا، أي تغيير بالإعدادات (تفعيل/تعطيل، المدة، التصميم) لا ينعكس على هذا
+  // الـhook النشط إلا بعد تحديث الصفحة كاملة.
   useEffect(() => {
     function handleSettingChange() {
       setEnabled(getScreensaverEnabled());
       setMinutes(getScreensaverMinutes());
       setDesign(getScreensaverDesign());
-      setCaption(getScreensaverCaption());
-      setBrand(getScreensaverBrand());
     }
     window.addEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
     return () => window.removeEventListener(SETTING_CHANGE_EVENT, handleSettingChange);
-  }, []);
-
-  // ⚠️ إضافة جديدة بطلب صريح: يشغّل شاشة التوقف فوراً لما يوصل حدث المعاينة —
-  // بغض النظر عن مؤقّت الخمول الحالي (ما يلغيه ولا يوقفه، بس يعرض الشاشة الآن
-  // بالإضافة). الإغلاق بنفس طريقة العرض العادي (نقرة على الشاشة نفسها).
-  useEffect(() => {
-    function handlePreviewTrigger() {
-      isActiveRef.current = true;
-      setIsActive(true);
-    }
-    window.addEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
-    return () => window.removeEventListener(PREVIEW_TRIGGER_EVENT, handlePreviewTrigger);
   }, []);
 
   function resetTimer() {
@@ -206,5 +138,5 @@ export function useIdleScreensaver() {
     resetTimer();
   }
 
-  return { isActive, enabled, minutes, design, caption, brand, toggleEnabled, dismiss };
+  return { isActive, enabled, minutes, design, toggleEnabled, dismiss };
 }

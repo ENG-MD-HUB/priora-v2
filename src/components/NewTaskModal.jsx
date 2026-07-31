@@ -11,10 +11,9 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { InvolvedContactsTypeahead } from './InvolvedContactsTypeahead';
-import { getEffectiveToday } from '../utils/taskDateLogic';
 
 export function NewTaskModal({ folderId, onClose, onSave }) {
-  const today = getEffectiveToday();
+  const today = new Date().toISOString().split('T')[0];
 
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');

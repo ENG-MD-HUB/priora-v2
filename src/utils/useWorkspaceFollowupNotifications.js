@@ -25,6 +25,7 @@ import { useWorkspacesStore } from './../store/workspacesStore';
 import { wsTaskService } from '../services/wsTaskService';
 import { notificationService } from '../services/notificationService';
 import { getEffectiveToday } from './taskDateLogic';
+import { desktopNotify } from './desktopNotify';
 
 export function useWorkspaceFollowupNotifications(uid) {
   const workspaces = useWorkspacesStore((s) => s.workspaces);
@@ -74,19 +75,10 @@ export function useWorkspaceFollowupNotifications(uid) {
             .catch((err) => console.warn('followup notif:', err));
         });
 
-        // إشعار سطح مكتب حقيقي — نفس منطق الهوك الشخصي بالضبط.
-        if (typeof Notification !== 'undefined') {
-          if (Notification.permission === 'default') Notification.requestPermission();
-          if (Notification.permission === 'granted') {
-            newlyDue.forEach((task) => {
-              try {
-                new Notification('Priora — Follow-up due', { body: `${task.name} (${ws.name})`, tag: `priora-ws-${task.id}` });
-              } catch {
-                // فشل إنشاء إشعار واحد لا يوقف الباقي.
-              }
-            });
-          }
-        }
+        // إشعار سطح مكتب حقيقي — عبر Service Worker لدعم Windows Action Center.
+        newlyDue.forEach((task) => {
+          desktopNotify('Priora — Follow-up due', `${task.name} (${ws.name})`, `priora-ws-${task.id}`);
+        });
 
         // نسجّل كل تاسك بالحارس المحلي بعد أول مرة يُعالَج فيها — بغض النظر هل
         // نجح إشعار سطح المكتب أو لا (النجاح بالجرس/Firestore هو الأهم هنا).

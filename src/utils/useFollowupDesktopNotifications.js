@@ -12,12 +12,14 @@
 //    حتى لو تغيّرت قائمة التاسكات وأعاد المكوّن الرندر.
 
 import { useEffect } from 'react';
+import { desktopNotify } from './desktopNotify';
 
 export function useFollowupDesktopNotifications(tasks) {
   useEffect(() => {
     if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'default') Notification.requestPermission();
-    if (Notification.permission !== 'granted') return;
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const sentKey = `priora_notif_sent_${today}`;
@@ -32,11 +34,7 @@ export function useFollowupDesktopNotifications(tasks) {
     if (dueTasks.length === 0) return;
 
     dueTasks.forEach((task) => {
-      try {
-        new Notification('Priora — Follow-up due', { body: task.name, tag: `priora-${task.id}` });
-      } catch {
-        // فشل إنشاء إشعار واحد (مثلاً صلاحية مسحوبة بنفس اللحظة) لا يوقف الباقي.
-      }
+      desktopNotify('Priora — Follow-up due', task.name, `priora-${task.id}`);
     });
 
     try {

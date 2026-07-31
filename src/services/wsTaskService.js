@@ -13,11 +13,9 @@ export const wsTaskService = {
     await setDoc(doc(db, 'workspaces', wsId, 'tasks', task.id), taskToFirestoreShape(task));
   },
 
-  // ⚠️ setDoc+merge بدل updateDoc (نفس سبب userScopedCrud.js بالضبط) — يتعامل
-  // بأمان حتى لو المستند مو موجود بعد بسباق نادر، بنفس سلوك الدمج الجزئي.
   async update(wsId, taskId, partialData) {
     const db = await getWorkspaceScopedDb();
-    await setDoc(doc(db, 'workspaces', wsId, 'tasks', taskId), partialData, { merge: true });
+    await updateDoc(doc(db, 'workspaces', wsId, 'tasks', taskId), partialData);
   },
 
   async delete(wsId, taskId) {

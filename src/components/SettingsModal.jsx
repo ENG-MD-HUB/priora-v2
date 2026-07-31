@@ -26,8 +26,8 @@ import { trashService } from '../services/trashService';
 import { contactsService } from '../services/contactsService';
 import { showToast } from '../store/toastStore';
 import { APP_VERSION } from '../utils/appConstants';
-import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign, triggerScreensaverPreview } from '../utils/useIdleScreensaver';
-import { isAdminUser, runFullAdminBackup, downloadBackupJson } from '../utils/adminBackup';
+import { getScreensaverEnabled, setScreensaverEnabled, getScreensaverMinutes, setScreensaverMinutes, getScreensaverDesign, setScreensaverDesign } from '../utils/useIdleScreensaver';
+import { FontScaleControl } from './FontScaleControl';
 
 const SCREENSAVER_DESIGN_OPTIONS = [
   {
@@ -67,34 +67,6 @@ const SCREENSAVER_DESIGN_OPTIONS = [
       </>
     ),
   },
-  {
-    id: 'warp',
-    label: 'Warp',
-    previewBg: '#03040a',
-    previewElement: (
-      <>
-        <div style={{ position: 'absolute', width: 16, height: 1.5, background: 'linear-gradient(to right, transparent, #dce8ff)', top: '30%', left: '52%', transform: 'rotate(20deg)' }} />
-        <div style={{ position: 'absolute', width: 20, height: 1.5, background: 'linear-gradient(to right, transparent, #fff)', top: '65%', left: '10%', transform: 'rotate(-15deg)' }} />
-        <div style={{ position: 'absolute', width: 14, height: 1.5, background: 'linear-gradient(to right, transparent, #fff4d9)', top: '20%', left: '8%', transform: 'rotate(200deg)' }} />
-        <div style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: 'radial-gradient(circle, #7d9bff, transparent)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-      </>
-    ),
-  },
-  {
-    id: 'galaxy',
-    label: 'Galaxy',
-    previewBg: '#020308',
-    previewElement: (
-      <>
-        <div style={{ position: 'absolute', width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,170,255,.6), transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', filter: 'blur(2px)' }} />
-        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 8, left: 14 }} />
-        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#c9a8ff', top: 26, left: 8 }} />
-        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#dce8ff', top: 12, left: 30 }} />
-        <div style={{ position: 'absolute', width: 1.5, height: 1.5, borderRadius: '50%', background: '#fff', top: 28, left: 26 }} />
-        <div style={{ position: 'absolute', width: 5, height: 5, borderRadius: '50%', background: '#fff', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-      </>
-    ),
-  },
 ];
 
 const FEATURES_LIST = [
@@ -121,7 +93,6 @@ const SETTINGS_TABS = [
 export function SettingsModal({ onClose, fontScale }) {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
-  const [adminBackupLoading, setAdminBackupLoading] = useState(false);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
   const lang = useUIStore((s) => s.lang);
@@ -153,7 +124,6 @@ export function SettingsModal({ onClose, fontScale }) {
     const safe = setScreensaverDesign(design);
     setScreensaverDesignState(safe);
   }
-
   const [savingProfile, setSavingProfile] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const fileInputRef = useRef(null);
@@ -169,25 +139,6 @@ export function SettingsModal({ onClose, fontScale }) {
       showToast(err instanceof Error ? err.message : 'Failed to update');
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  // ⚠️ إضافة بطلب صريح: نسخة احتياطية كاملة لقاعدة البيانات (كل المستخدمين).
-  // الحماية الحقيقية بقاعدة أمان Firestore (السيرفر) — هذا التحقق هنا (isAdminUser)
-  // مجرد تحسين تجربة استخدام (يخفي الزر عن غير الأدمن)، مو الحماية الفعلية.
-  async function handleAdminBackup() {
-    setAdminBackupLoading(true);
-    showToast('Running full admin backup — this may take a moment…');
-    try {
-      const data = await runFullAdminBackup(user?.uid);
-      downloadBackupJson(data);
-      const userCount = Object.keys(data.users).length;
-      const wsCount = Object.keys(data.workspaces).length;
-      showToast(`Admin backup complete — ${userCount} users, ${wsCount} workspaces`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Admin backup failed', 'error');
-    } finally {
-      setAdminBackupLoading(false);
     }
   }
 
@@ -452,23 +403,16 @@ export function SettingsModal({ onClose, fontScale }) {
                         ))}
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => triggerScreensaverPreview()}
-                      style={{
-                        marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                        padding: '9px 14px', background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)',
-                        borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                      Preview screensaver
-                    </button>
                   </>
                 )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>App Size</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>Zoom level</span>
+                  {fontScale && <FontScaleControl fontScale={fontScale} />}
+                </div>
               </div>
             </div>
           )}
@@ -501,26 +445,6 @@ export function SettingsModal({ onClose, fontScale }) {
                   Download Backup
                 </button>
               </div>
-
-              {isAdminUser(user?.uid) && (
-                <div style={{ background: 'color-mix(in srgb, var(--red) 6%, var(--surface2))', border: '1px solid color-mix(in srgb, var(--red) 30%, var(--border))', borderRadius: 10, padding: '16px 18px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}>⚠ Admin: Full Database Backup</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, lineHeight: 1.5 }}>
-                    Exports every user's data and every workspace — visible only to the admin account.
-                  </div>
-                  <button
-                    onClick={handleAdminBackup}
-                    disabled={adminBackupLoading}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', background: 'var(--red)',
-                      color: '#fff', border: 'none', borderRadius: 7, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500,
-                      cursor: adminBackupLoading ? 'not-allowed' : 'pointer', opacity: adminBackupLoading ? 0.6 : 1,
-                    }}
-                  >
-                    {adminBackupLoading ? 'Backing up…' : 'Download Full Admin Backup'}
-                  </button>
-                </div>
-              )}
 
               <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Restore from Backup</div>

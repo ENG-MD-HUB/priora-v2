@@ -112,11 +112,7 @@ export const workspaceService = {
         const data = wsDoc.data();
         if (data._placeholder || !data.name) continue;
 
-        // ⚠️ تصحيح خلل حقيقي: ?? [] يتعامل بس مع null/undefined — لو data.members
-        // موجود لكن نوعه مو array فعلاً (مستند قديم/تالف بقيمة خاطئة)، ?? ما
-        // يلتقطها، و.some() تنهار بـTypeError. Array.isArray يتحقق من النوع
-        // الفعلي، يحمي من أي قيمة غير متوقعة.
-        const members = Array.isArray(data.members) ? data.members : [];
+        const members = data.members ?? [];
         const isMember = members.some((m) => m.uid === uid);
         if (isMember) {
           result.push({

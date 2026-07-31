@@ -8,6 +8,7 @@
 
 import { isTaskOverdue, daysSince, wasUpdatedToday, formatDateForDisplay, isToday } from '../utils/taskDateLogic';
 import { getDaysSinceColor, getFollowupDateColor } from '../utils/taskColors';
+import { TextCell, NoteCell } from './TextCell';
 
 const STATUS_LABELS = {
   active: 'Action Required',
@@ -24,14 +25,8 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
   const days = daysSince(task.lastUpdate);
   const daysColor = getDaysSinceColor(days);
   const updatedToday = wasUpdatedToday(task);
-  const dotClass = task._conflictPending
-    ? 'sdot sdot-conflict'
-    : task.priority === 'urgent'
-    ? 'sdot sdot-urgent'
-    : updatedToday
-    ? 'sdot sdot-today'
-    : `sdot sdot-${task.status}`;
-  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
+  const dotClass =
+    task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
 
   return (
     <div
@@ -42,19 +37,17 @@ export function TaskRow({ task, onDetail, onUpdate, onNavigate }) {
         onDetail();
       }}
     >
-      <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden', minWidth: 0 }}>
+      <div className="task-cell-name">
         <div className={dotClass} style={{ flexShrink: 0 }} />
-        <span className="task-name-text" style={{ fontWeight: 500, color: 'var(--text)', fontSize: 13 }}>
-          {task.name}
-        </span>
+        <TextCell text={task.name} style={{ fontWeight: 500, color: 'var(--text)', fontSize: 13 }} />
       </div>
 
-      <div className="task-note-text" style={{ padding: '9px 12px', fontSize: 13, color: 'var(--text2)' }}>
-        {latestNote}
+      <div className="task-cell-note">
+        <NoteCell text={latestNote} style={{ fontSize: 13, color: 'var(--text2)' }} />
       </div>
 
       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>
+        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>
           {formatDateForDisplay(task.lastUpdate)}
         </span>
         {days > 0 && days < 9999 && (

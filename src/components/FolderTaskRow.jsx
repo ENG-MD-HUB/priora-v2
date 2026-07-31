@@ -6,6 +6,7 @@
 import { isTaskOverdue, daysSince, wasUpdatedToday, formatDateForDisplay, isToday } from '../utils/taskDateLogic';
 import { getDaysSinceColor, getFollowupDateColor } from '../utils/taskColors';
 import { highlightMatch } from '../utils/highlightMatch';
+import { TextCell, NoteCell } from './TextCell';
 
 export const FOLDER_TASK_ROW_GRID_COLUMNS = 'minmax(180px,2.5fr) minmax(160px,3fr) 120px 130px 150px 110px';
 
@@ -19,16 +20,7 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
   const latestNote = task.timeline.length > 0 ? task.timeline[0].text : '—';
   const highlightedName = searchQuery ? highlightMatch(task.name, searchQuery) : undefined;
   const highlightedNote = searchQuery ? highlightMatch(latestNote, searchQuery) : undefined;
-  const dotClass = task._conflictPending
-    ? 'sdot sdot-conflict'
-    : task.priority === 'urgent'
-    ? 'sdot sdot-urgent'
-    : updatedToday
-    ? 'sdot sdot-today'
-    : `sdot sdot-${task.status}`;
-  // ⚠️ إضافة بطلب صريح: تعديل صار وأنت أوفلاين وتعارض مع نسخة أحدث بالسيرفر —
-  // عالق محلياً بهذا الجهاز بس، لسا ما ارتفع. برتقالي بدل لون daysColor العادي.
-  const lastUpdateColor = task._conflictPending ? 'var(--orange)' : daysColor;
+  const dotClass = task.priority === 'urgent' ? 'sdot sdot-urgent' : updatedToday ? 'sdot sdot-today' : `sdot sdot-${task.status}`;
 
   return (
     <div
@@ -37,13 +29,13 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
       onClick={onDetail}
       onContextMenu={onCtx}
     >
-      <div style={{ padding: '9px 12px', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+      <div className="task-cell-name">
         <div className={dotClass} style={{ flexShrink: 0 }} />
-        {highlightedName ? (
-          <span title={task.name} className="task-name-text" style={{ fontWeight: 500, color: 'var(--text)', fontSize: 13, flex: 1, minWidth: 0 }} dangerouslySetInnerHTML={{ __html: highlightedName }} />
-        ) : (
-          <span title={task.name} className="task-name-text" style={{ fontWeight: 500, color: 'var(--text)', fontSize: 13, flex: 1, minWidth: 0 }}>{task.name}</span>
-        )}
+        <TextCell
+          text={task.name}
+          html={highlightedName}
+          style={{ fontWeight: 500, color: 'var(--text)', fontSize: 13 }}
+        />
         {(task.sharedToWsIds?.length ?? 0) > 0 && (
           <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '.04em', background: 'color-mix(in srgb,var(--accent) 12%,var(--surface2))', color: 'var(--accent-text)', border: '1px solid color-mix(in srgb,var(--accent) 25%,var(--border))', borderRadius: 99, padding: '1px 6px', flexShrink: 0, textTransform: 'uppercase' }}>
             shared
@@ -51,14 +43,12 @@ export function FolderTaskRow({ task, searchQuery, onCtx, onUpdate, onDetail, on
         )}
       </div>
 
-      {highlightedNote ? (
-        <div className="task-note-text" style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text)' }} dangerouslySetInnerHTML={{ __html: highlightedNote }} />
-      ) : (
-        <div className="task-note-text" style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text)' }}>{latestNote}</div>
-      )}
+      <div className="task-cell-note">
+        <NoteCell text={latestNote} html={highlightedNote} style={{ fontSize: 12, color: 'var(--text)' }} />
+      </div>
 
       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-        <span title={task._conflictPending ? 'Pending change — could not sync yet, staying on this device only' : undefined} style={{ fontSize: 13, color: lastUpdateColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
+        <span style={{ fontSize: 13, color: daysColor, fontFamily: 'var(--mono)' }}>{formatDateForDisplay(task.lastUpdate)}</span>
         {days > 0 && days < 9999 && (
           <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, color: daysColor, background: `color-mix(in srgb,${daysColor} 12%,var(--surface2))`, border: `1px solid color-mix(in srgb,${daysColor} 25%,var(--border))`, borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
             +{days}

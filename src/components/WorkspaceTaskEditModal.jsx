@@ -5,9 +5,9 @@
 
 import { useState } from 'react';
 import { Modal } from './Modal';
+import { wsTaskService } from '../services/wsTaskService';
 import { showToast } from '../store/toastStore';
 import { getEffectiveToday } from '../utils/taskDateLogic';
-import { applyWsTaskChangeAndSyncPersonal } from '../utils/applyWsTaskChange';
 
 export function WorkspaceTaskEditModal({ task, wsId, onClose }) {
   const [name, setName] = useState(task.name);
@@ -17,16 +17,13 @@ export function WorkspaceTaskEditModal({ task, wsId, onClose }) {
   const [followupDate, setFollowupDate] = useState(task.nextFollowup ?? '');
   const [saving, setSaving] = useState(false);
 
-  // ⚠️ تصحيح خلل حقيقي (نفس فئة "المسار المكرر" بالضبط): كانت wsTaskService.save
-  // — استبدال كامل لنسخة الورك سبيس، بدون أي مزامنة للمصدر الشخصي إطلاقاً. الآن
-  // تحديث جزئي (الحقول المتغيّرة فقط) + مزامنة آمنة (retry + فحص تعارض) عبر
-  // applyWsTaskChangeAndSyncPersonal المشتركة.
   async function handleSubmit(e) {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await applyWsTaskChangeAndSyncPersonal(task, wsId, {
+      await wsTaskService.save(wsId, {
+        ...task,
         name: name.trim(),
         desc: desc.trim(),
         status,
